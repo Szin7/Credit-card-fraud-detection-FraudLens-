@@ -1,0 +1,106 @@
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: airflow/Dockerfile
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-fraudlens}:${POSTGRES_PASSWORD:-fraudlens}@postgres:5432/${AIRFLOW_DB:-airflow}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    # So `from scripts...` / `from src...` inside DAGs resolve against the
+    # bind-mounted project code below, the same layout src/utils/config.py
+    # expects (config/, data/, models/ as siblings of src/).
+    PYTHONPATH: /opt/airflow
+    STORAGE_MODE: ${STORAGE_MODE:-local}
+    RAW_DATA_FILENAME: ${RAW_DATA_FILENAME:-creditcard_sample.csv}
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: ${POSTGRES_DB:-fraudlens}
+    POSTGRES_USER: ${POSTGRES_USER:-fraudlens}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fraudlens}
+    AWS_REGION: ${AWS_REGION:-us-east-1}
+    AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+  volumes: &airflow-common-volumes
+    - ./airflow/dags:/opt/airflow/dags
+    - ./src:/opt/airflow/src
+    - ./scripts:/opt/airflow/scripts
+    - ./config:/opt/airflow/config
+    - ./data:/opt/airflow/data
+    - ./models:/opt/airflow/models
+    - airflow_logs:/opt/airflow/logs
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fraudlens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fraudlens}
+      POSTGRES_DB: ${POSTGRES_DB:-fraudlens}
+      AIRFLOW_DB: ${AIRFLOW_DB:-airflow}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init/01_create_airflow_db.sh:/docker-entrypoint-initdb.d/01_create_airflow_db.sh
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/02_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fraudlens} -d ${POSTGRES_DB:-fraudlens}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-fraudlens}
+      POSTGRES_USER: ${POSTGRES_USER:-fraudlens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fraudlens}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - >
+        airflow db migrate &&
+        airflow users create
+        --username ${AIRFLOW_ADMIN_USER:-admin}
+        --password ${AIRFLOW_ADMIN_PASSWORD:-admin}
+        --firstname Admin --lastname User --role Admin --email admin@example.com || true
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  airflow_logs:
