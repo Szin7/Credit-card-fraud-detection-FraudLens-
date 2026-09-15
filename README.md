@@ -207,19 +207,20 @@ Requires Python 3.11+ (tested on 3.13) and, for the full stack, Docker.
 
 ```bash
 python -m venv .venv
-.venv/bin/activate       # .venv\Scripts\activate on native Windows
+source .venv/bin/activate     # .venv\Scripts\activate on native Windows
 pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Local (no Docker) — generates the synthetic sample, runs the full
-pipeline against SQLite-free logic, and trains/scores locally:
+Local, no database (writes to `data/processed/`, nothing persisted):
 
 ```bash
-make sample-data
-make train
+make sample-data    # generates data/raw/creditcard_sample.csv
+make ingest         # records an ingestion manifest
+make validate       # -> data/processed/transactions_valid.csv
+make train          # compares 5 models, saves the champion to models/
 make threshold      # review output, optionally update config/settings.yaml
-make predict
+make predict        # -> data/processed/predictions.csv
 ```
 
 Full stack (Postgres + Airflow + dashboard):
@@ -228,12 +229,17 @@ Full stack (Postgres + Airflow + dashboard):
 docker compose up --build
 ```
 
-- Dashboard: <http://localhost:8501>
+- Dashboard: <http://localhost:8501> — empty until predictions exist in
+  Postgres.
 - Airflow UI: <http://localhost:8080> (default login `admin` / `admin`,
   configurable via `AIRFLOW_ADMIN_USER` / `AIRFLOW_ADMIN_PASSWORD` in
-  `.env` — local dev only, not a production credential)
-- Trigger `fraud_training_pipeline` once, then `fraud_inference_pipeline`,
-  from the Airflow UI to populate Postgres end to end.
+  `.env` — local dev only, not a production credential). Trigger
+  `fraud_training_pipeline` once, then `fraud_inference_pipeline`, to
+  populate Postgres end to end.
+- Alternatively, with the `postgres` container up (`docker compose up postgres -d`)
+  and `.env`'s `POSTGRES_HOST=localhost` (the container publishes 5432 to
+  the host by default), `make pipeline` runs the same two pipelines
+  directly without Airflow.
 
 ## Running Tests
 
