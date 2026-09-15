@@ -20,13 +20,12 @@ from pathlib import Path
 import joblib
 import pandas as pd
 
+from src.processing.transform import FEATURE_COLUMNS, load_processed_transactions
 from src.utils.config import settings
 from src.utils.logging import get_logger, log_event
-from src.validation.schema import V_FEATURE_COLUMNS
 
 logger = get_logger(__name__)
 
-FEATURE_COLUMNS = ["Time", "Amount", *V_FEATURE_COLUMNS]
 PREDICTIONS_FILENAME = "predictions.csv"
 
 
@@ -51,8 +50,7 @@ def generate_predictions(df: pd.DataFrame | None = None, input_path: Path | None
     risk_level, is_flagged, model_version, threshold, prediction_timestamp.
     """
     if df is None:
-        path = input_path or (settings.processed_dir / "transactions_valid.csv")
-        df = pd.read_csv(path)
+        df = load_processed_transactions(input_path)
 
     pipeline = load_model()
     model_version = load_model_version()

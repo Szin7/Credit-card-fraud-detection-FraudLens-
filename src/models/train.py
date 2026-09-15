@@ -44,21 +44,18 @@ from xgboost import XGBClassifier
 
 from src.features.build_features import build_feature_pipeline
 from src.models.evaluate import compute_metrics, precision_recall_curve_points, roc_curve_points
+from src.processing.transform import FEATURE_COLUMNS, TARGET_COLUMN, load_processed_transactions
 from src.utils.config import settings
 from src.utils.logging import get_logger, log_event
-from src.validation.schema import V_FEATURE_COLUMNS
 
 logger = get_logger(__name__)
 
-FEATURE_COLUMNS = ["Time", "Amount", *V_FEATURE_COLUMNS]
-TARGET_COLUMN = "Class"
 VAL_FRACTION_OF_REMAINDER = 0.2
 TEST_FRACTION = 0.2
 
 
 def load_training_data(path: Path | None = None) -> pd.DataFrame:
-    path = path or (settings.processed_dir / "transactions_valid.csv")
-    return pd.read_csv(path)
+    return load_processed_transactions(path)
 
 
 def split_data(df: pd.DataFrame, seed: int):
