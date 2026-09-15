@@ -43,7 +43,8 @@ from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 
 from src.features.build_features import build_feature_pipeline
-from src.models.evaluate import compute_metrics, precision_recall_curve_points, roc_curve_points
+from src.models.evaluate import compute_metrics, precision_recall_curve_points, roc_curve_points, threshold_sweep
+from src.models.explain import get_feature_importance, get_shap_importance
 from src.processing.transform import FEATURE_COLUMNS, TARGET_COLUMN, load_processed_transactions
 from src.utils.config import settings
 from src.utils.logging import get_logger, log_event
@@ -166,7 +167,7 @@ def train_and_compare(seed: int = settings.random_seed):
         log_event(logger, "model_trained", model=name, pr_auc=metrics.pr_auc, roc_auc=metrics.roc_auc)
 
     comparison_df = pd.DataFrame(comparison_rows)
-    return trained, comparison_df, (X_test, y_test)
+    return trained, comparison_df, (X_val, y_val), (X_test, y_test)
 
 
 def select_champion(trained: list[TrainedModel]) -> TrainedModel:
@@ -180,14 +181,32 @@ def select_champion(trained: list[TrainedModel]) -> TrainedModel:
 def main() -> None:
     settings.model_dir.mkdir(parents=True, exist_ok=True)
 
-    trained, comparison_df, (X_test, y_test) = train_and_compare()
+    trained, comparison_df, (X_val, y_val), (X_test, y_test) = train_and_compare()
     comparison_df.to_csv(settings.model_dir / "model_comparison.csv", index=False)
 
     champion = select_champion(trained)
+    val_proba = champion.pipeline.predict_proba(X_val)[:, 1]
     test_proba = champion.pipeline.predict_proba(X_test)[:, 1]
     test_metrics = compute_metrics(y_test.to_numpy(), test_proba, threshold=settings.decision_threshold)
 
     joblib.dump(champion.pipeline, settings.model_path)
+
+    # Threshold sweep on the validation set (never test) for the dashboard's
+    # interactive threshold-tradeoff table — see scripts/optimize_threshold.py,
+    # which computes the same thing standalone for a human reviewing whether
+    # to change config/settings.yaml's decision_threshold.
+    val_sweep = threshold_sweep(y_val.to_numpy(), val_proba)
+    val_sweep["expected_cost"] = [
+        settings.cost_model.expected_cost(int(fn), int(fp))
+        for fn, fp in zip(val_sweep["false_negatives"], val_sweep["false_positives"])
+    ]
+
+    # Computed here (not in the dashboard) so the dashboard only ever reads
+    # from Postgres and never needs the model file, ML libraries, or
+    # data/processed/ mounted into its own container.
+    native_importance = get_feature_importance(champion.pipeline).to_dict(orient="records")
+    shap_importance_df = get_shap_importance(champion.pipeline, X_val)
+    shap_importance = shap_importance_df.to_dict(orient="records") if shap_importance_df is not None else None
 
     metadata = {
         "model_type": champion.name,
@@ -199,7 +218,9 @@ def main() -> None:
         "test_metrics": test_metrics.to_dict(),
         "precision_recall_curve": precision_recall_curve_points(y_test.to_numpy(), test_proba),
         "roc_curve": roc_curve_points(y_test.to_numpy(), test_proba),
+        "threshold_sweep": val_sweep.to_dict(orient="records"),
         "model_comparison": comparison_df.to_dict(orient="records"),
+        "feature_importance": {"native": native_importance, "shap": shap_importance},
     }
     with open(settings.model_metadata_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)

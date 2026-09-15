@@ -104,11 +104,14 @@ def test_search_predictions_filters_by_risk_and_probability(session_factory):
     repo.save_transactions(_sample_transactions(), source_run_id="run-4", session_factory=session_factory)
     repo.save_predictions(_sample_predictions(), session_factory=session_factory)
 
-    high_only = repo.search_predictions(risk_level="HIGH", session_factory=session_factory)
+    high_only = repo.search_predictions(risk_levels=["HIGH"], session_factory=session_factory)
     assert set(high_only["transaction_id"]) == {"tx-0", "tx-4"}
 
     above_threshold = repo.search_predictions(min_probability=0.6, session_factory=session_factory)
     assert len(above_threshold) == 2
+
+    assert repo.count_predictions(risk_levels=["HIGH"], session_factory=session_factory) == 2
+    assert repo.count_predictions(min_probability=0.6, session_factory=session_factory) == 2
 
 
 def test_get_transaction_detail_joins_transaction_and_prediction(session_factory):
@@ -132,7 +135,17 @@ def test_save_model_run_marks_champion_and_replaces_previous(session_factory):
         "random_seed": 42,
         "feature_columns": ["Time", "Amount"],
         "validation_metrics": {"precision": 0.8, "recall": 0.7},
-        "test_metrics": {"precision": 0.8, "recall": 0.7, "f1": 0.75, "roc_auc": 0.95, "pr_auc": 0.6},
+        "test_metrics": {
+            "precision": 0.8,
+            "recall": 0.7,
+            "f1": 0.75,
+            "roc_auc": 0.95,
+            "pr_auc": 0.6,
+            "true_negatives": 100,
+            "false_positives": 5,
+            "false_negatives": 3,
+            "true_positives": 7,
+        },
         "precision_recall_curve": {"precision": [1.0, 0.5], "recall": [0.0, 1.0], "thresholds": [0.9, 0.1]},
         "roc_curve": {"fpr": [0.0, 1.0], "tpr": [0.0, 1.0], "thresholds": [0.9, 0.1]},
         "model_comparison": [{"model": "logistic_regression", "pr_auc": 0.6}],

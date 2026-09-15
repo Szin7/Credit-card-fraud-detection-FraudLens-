@@ -146,6 +146,14 @@ def save_model_run(metadata: dict, session_factory: sessionmaker | None = None) 
                     "precision_recall_curve": metadata["precision_recall_curve"],
                     "roc_curve": metadata["roc_curve"],
                     "validation_metrics": val_metrics,
+                    "threshold_sweep": metadata.get("threshold_sweep", []),
+                    "feature_importance": metadata.get("feature_importance", {"native": [], "shap": None}),
+                    "test_confusion_matrix": {
+                        "true_negatives": test_metrics["true_negatives"],
+                        "false_positives": test_metrics["false_positives"],
+                        "false_negatives": test_metrics["false_negatives"],
+                        "true_positives": test_metrics["true_positives"],
+                    },
                 },
                 model_comparison=metadata["model_comparison"],
                 created_at=datetime.now(timezone.utc),
@@ -227,8 +235,33 @@ def get_recent_high_risk(limit: int = 20, session_factory: sessionmaker | None =
     )
 
 
+def _prediction_search_filters(
+    query,
+    risk_levels: list[str] | None,
+    transaction_id_contains: str | None,
+    min_probability: float | None,
+    max_probability: float | None,
+    min_amount: float | None,
+    max_amount: float | None,
+):
+    if risk_levels:
+        query = query.where(FraudPrediction.risk_level.in_(risk_levels))
+    if transaction_id_contains:
+        query = query.where(FraudPrediction.transaction_id.contains(transaction_id_contains))
+    if min_probability is not None:
+        query = query.where(FraudPrediction.fraud_probability >= min_probability)
+    if max_probability is not None:
+        query = query.where(FraudPrediction.fraud_probability <= max_probability)
+    if min_amount is not None:
+        query = query.where(Transaction.amount >= min_amount)
+    if max_amount is not None:
+        query = query.where(Transaction.amount <= max_amount)
+    return query
+
+
 def search_predictions(
-    risk_level: str | None = None,
+    risk_levels: list[str] | None = None,
+    transaction_id_contains: str | None = None,
     min_probability: float | None = None,
     max_probability: float | None = None,
     min_amount: float | None = None,
@@ -250,18 +283,9 @@ def search_predictions(
         FraudPrediction.model_version,
         FraudPrediction.prediction_timestamp,
     ).join(Transaction, Transaction.transaction_id == FraudPrediction.transaction_id)
-
-    if risk_level:
-        query = query.where(FraudPrediction.risk_level == risk_level)
-    if min_probability is not None:
-        query = query.where(FraudPrediction.fraud_probability >= min_probability)
-    if max_probability is not None:
-        query = query.where(FraudPrediction.fraud_probability <= max_probability)
-    if min_amount is not None:
-        query = query.where(Transaction.amount >= min_amount)
-    if max_amount is not None:
-        query = query.where(Transaction.amount <= max_amount)
-
+    query = _prediction_search_filters(
+        query, risk_levels, transaction_id_contains, min_probability, max_probability, min_amount, max_amount
+    )
     query = query.order_by(FraudPrediction.fraud_probability.desc()).limit(limit).offset(offset)
 
     with session_scope(session_factory) as session:
@@ -280,6 +304,28 @@ def search_predictions(
             "prediction_timestamp",
         ],
     )
+
+
+def count_predictions(
+    risk_levels: list[str] | None = None,
+    transaction_id_contains: str | None = None,
+    min_probability: float | None = None,
+    max_probability: float | None = None,
+    min_amount: float | None = None,
+    max_amount: float | None = None,
+    session_factory: sessionmaker | None = None,
+) -> int:
+    """Total rows matching the same filters as search_predictions(), for
+    pagination controls.
+    """
+    query = select(func.count()).select_from(FraudPrediction).join(
+        Transaction, Transaction.transaction_id == FraudPrediction.transaction_id
+    )
+    query = _prediction_search_filters(
+        query, risk_levels, transaction_id_contains, min_probability, max_probability, min_amount, max_amount
+    )
+    with session_scope(session_factory) as session:
+        return int(session.scalar(query) or 0)
 
 
 def get_transaction_detail(transaction_id: str, session_factory: sessionmaker | None = None) -> dict | None:
