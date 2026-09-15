@@ -81,7 +81,7 @@ with col1:
         )
         fig.update_yaxes(autorange="reversed")
         fig = apply_chart_theme(fig, height=280)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
 with col2:
     with st.container(border=True):
@@ -102,7 +102,7 @@ with col2:
                 "pr_auc": st.column_config.NumberColumn("PR-AUC", format="%.4f"),
             },
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
 
 st.write("")
@@ -122,7 +122,7 @@ with col3:
         fig.update_xaxes(title_text="Recall", range=[0, 1])
         fig.update_yaxes(title_text="Precision", range=[0, 1.02])
         fig = apply_chart_theme(fig, height=300)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
 with col4:
     with st.container(border=True):
@@ -138,7 +138,7 @@ with col4:
         fig.update_xaxes(title_text="False Positive Rate", range=[0, 1])
         fig.update_yaxes(title_text="True Positive Rate", range=[0, 1.02])
         fig = apply_chart_theme(fig, height=300)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
 st.write("")
 with st.container(border=True):
@@ -158,7 +158,7 @@ with st.container(border=True):
     fig.update_xaxes(title_text="Decision threshold", range=[0, 1])
     fig.update_yaxes(title_text="Score", range=[0, 1.05])
     fig = apply_chart_theme(fig, height=320)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
     threshold_options = sweep["threshold"].tolist()
     default_idx = min(range(len(threshold_options)), key=lambda i: abs(threshold_options[i] - champion["decision_threshold"]))
@@ -185,7 +185,7 @@ with st.container(border=True):
                 "expected_cost": st.column_config.NumberColumn("Expected Cost", format="%.0f"),
             },
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
 
 st.write("")
@@ -214,7 +214,7 @@ with st.container(border=True):
             fig.update_yaxes(autorange="reversed")
             fig.update_xaxes(title_text="Importance (|coefficient| or impurity-based)")
             fig = apply_chart_theme(fig, height=max(260, 24 * len(native_df)))
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
     if shap_records:
         with tabs[1]:
@@ -225,4 +225,4 @@ with st.container(border=True):
             fig.update_yaxes(autorange="reversed")
             fig.update_xaxes(title_text="Mean |SHAP value|")
             fig = apply_chart_theme(fig, height=max(260, 24 * len(shap_df)))
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})

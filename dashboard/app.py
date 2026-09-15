@@ -35,12 +35,10 @@ pages = [
 
 with st.sidebar:
     st.markdown(
-        """
-        <div style="padding: 4px 0 20px 0;">
-            <div style="font-size: 19px; font-weight: 700; color: #12141C;">FraudLens</div>
-            <div style="font-size: 12.5px; color: #667085;">Transaction Risk Intelligence</div>
-        </div>
-        """,
+        '<div style="padding: 4px 0 20px 0;">'
+        '<div style="font-size: 19px; font-weight: 700; color: #12141C;">FraudLens</div>'
+        '<div style="font-size: 12.5px; color: #667085;">Transaction Risk Intelligence</div>'
+        "</div>",
         unsafe_allow_html=True,
     )
 

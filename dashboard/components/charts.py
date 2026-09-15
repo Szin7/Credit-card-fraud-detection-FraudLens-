@@ -16,7 +16,6 @@ def apply_chart_theme(fig: go.Figure, height: int = 320) -> go.Figure:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family=FONT_STACK, size=13, color=COLORS["text_primary"]),
-        title_font=dict(size=14, color=COLORS["text_primary"]),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=12)),
         hoverlabel=dict(bgcolor=COLORS["surface"], font_size=12, font_family=FONT_STACK),
     )

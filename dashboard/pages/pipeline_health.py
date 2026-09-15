@@ -82,5 +82,5 @@ with st.container(border=True):
             "error_message": st.column_config.TextColumn("Error"),
         },
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
     )

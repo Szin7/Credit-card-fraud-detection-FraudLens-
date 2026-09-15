@@ -57,7 +57,7 @@ results = repo.search_predictions(**filters, limit=PAGE_SIZE, offset=offset)
 st.write("")
 nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
 with nav_col1:
-    if st.button("Previous", disabled=st.session_state.explorer_page == 0, use_container_width=True):
+    if st.button("Previous", disabled=st.session_state.explorer_page == 0, width="stretch"):
         st.session_state.explorer_page -= 1
         st.rerun()
 with nav_col2:
@@ -69,7 +69,7 @@ with nav_col2:
         unsafe_allow_html=True,
     )
 with nav_col3:
-    if st.button("Next", disabled=st.session_state.explorer_page >= total_pages - 1, use_container_width=True):
+    if st.button("Next", disabled=st.session_state.explorer_page >= total_pages - 1, width="stretch"):
         st.session_state.explorer_page += 1
         st.rerun()
 
@@ -91,7 +91,7 @@ with st.container(border=True):
             "prediction_timestamp": st.column_config.DatetimeColumn("Predicted At", format="YYYY-MM-DD HH:mm"),
         },
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         on_select="rerun",
         selection_mode="single-row",
     )

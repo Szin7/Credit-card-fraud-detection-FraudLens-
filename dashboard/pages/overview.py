@@ -89,7 +89,7 @@ with st.container(border=True):
         fig.update_yaxes(title_text="Avg. fraud probability", secondary_y=True, range=[0, 1])
         fig.update_xaxes(title_text="Hour since first transaction")
         fig = apply_chart_theme(fig, height=360)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
 st.write("")
 col1, col2 = st.columns(2)
@@ -113,7 +113,7 @@ with col1:
         )
         fig.update_xaxes(title_text="Transactions")
         fig = apply_chart_theme(fig, height=260)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
 with col2:
     with st.container(border=True):
@@ -134,7 +134,7 @@ with col2:
             fig.update_xaxes(title_text="Hour since first transaction")
             fig.update_yaxes(title_text="Transactions")
             fig = apply_chart_theme(fig, height=260)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
 st.write("")
 with st.container(border=True):
@@ -156,5 +156,5 @@ with st.container(border=True):
                 "prediction_timestamp": st.column_config.DatetimeColumn("Predicted At", format="YYYY-MM-DD HH:mm"),
             },
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )

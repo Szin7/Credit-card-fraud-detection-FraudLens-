@@ -7,6 +7,8 @@ drifting into inconsistent one-off styling.
 
 from __future__ import annotations
 
+import textwrap
+
 import streamlit as st
 
 COLORS = {
@@ -39,7 +41,8 @@ RISK_COLOR_MAP = {
 
 def inject_global_styles() -> None:
     st.markdown(
-        f"""
+        textwrap.dedent(
+            f"""\
         <style>
         html, body, [class*="css"] {{
             font-family: {FONT_STACK};
@@ -161,6 +164,7 @@ def inject_global_styles() -> None:
             margin-bottom: 12px;
         }}
         </style>
-        """,
+        """
+        ),
         unsafe_allow_html=True,
     )
