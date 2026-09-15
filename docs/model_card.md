@@ -111,9 +111,10 @@ tuning, only this single final report:
 |---|---|
 | Precision | 0.8077 |
 | Recall | 0.8750 |
+| F1 | 0.8400 |
 | PR-AUC | 0.9427 |
 | ROC-AUC | 0.9993 |
-| Confusion matrix | TN=4794, FP=6, FN=3, TP=21 |
+| Confusion matrix | TN=4795, FP=5, FN=3, TP=21 |
 
 ## Threshold
 
