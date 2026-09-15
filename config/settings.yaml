@@ -1,0 +1,35 @@
+# Non-secret, tunable configuration. Secrets and environment-specific values
+# (storage mode, DB connection, filenames) live in .env — see .env.example.
+
+random_seed: 42
+
+paths:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  rejected_dir: data/rejected
+  model_dir: models
+
+model:
+  champion_filename: fraud_model.joblib
+  metadata_filename: fraud_model_metadata.json
+  # Placeholder until Stage 5's threshold analysis writes the value that
+  # actually maximizes F1 on the validation set for the trained model.
+  decision_threshold: 0.50
+
+# UI risk categories shown on the dashboard — a separate concept from the
+# decision threshold above. A transaction can be labeled HIGH risk for a
+# human reviewer without the model's binary decision flipping to "fraud".
+risk_bands:
+  low_max: 0.30
+  review_max: 0.70
+
+# Simplified, illustrative cost simulation for threshold selection.
+# These are not real business figures — see docs/model_card.md.
+cost_model:
+  false_negative_cost: 500
+  false_positive_cost: 5
+
+validation:
+  # Above this fraction of duplicate rows, the validation summary flags the
+  # batch for review rather than silently deduping.
+  max_duplicate_ratio_warning: 0.05

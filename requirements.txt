@@ -1,0 +1,21 @@
+# Pinned to the versions actually installed and tested against Python 3.13
+# in this repo (see README > Running Locally). Transitive dependencies are
+# left to pip's resolver rather than fully locked, to keep this readable.
+pandas==3.0.5
+numpy==2.5.3
+scipy==1.18.1
+scikit-learn==1.9.1
+xgboost==3.4.1
+imbalanced-learn==0.14.2
+shap==0.52.0
+SQLAlchemy==2.0.53
+psycopg2-binary==2.9.13
+boto3==1.43.94
+streamlit==1.63.0
+plotly==7.0.0
+python-dotenv==1.2.3
+PyYAML==6.0.3
+joblib==1.6.0
+pytest==9.1.1
+moto[s3]==5.2.3
+jupyter==1.1.1
