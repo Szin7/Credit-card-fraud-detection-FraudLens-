@@ -46,18 +46,30 @@ class ValidationSummary:
     invalid_time_rows: int
     non_numeric_feature_rows: int
     unexpected_columns: list[str]
+    # True when duplicate_rows / total_rows exceeds
+    # config/settings.yaml > validation > max_duplicate_ratio_warning — a
+    # batch with an unusually high duplicate rate often signals an upstream
+    # data issue (a retried export, a bug feeding the same file twice)
+    # worth a human's attention rather than silently deduping and moving on.
+    high_duplicate_ratio: bool
 
     def to_dict(self) -> dict:
         return asdict(self)
 
     def as_text(self) -> str:
-        return (
-            f"Total rows:        {self.total_rows}\n"
-            f"Valid rows:        {self.valid_rows}\n"
-            f"Rejected rows:     {self.rejected_rows}\n"
-            f"Duplicate rows:    {self.duplicate_rows}\n"
-            f"Missing values:    {self.missing_value_rows}"
-        )
+        lines = [
+            f"Total rows:        {self.total_rows}",
+            f"Valid rows:        {self.valid_rows}",
+            f"Rejected rows:     {self.rejected_rows}",
+            f"Duplicate rows:    {self.duplicate_rows}",
+            f"Missing values:    {self.missing_value_rows}",
+        ]
+        if self.high_duplicate_ratio:
+            lines.append(
+                f"WARNING: duplicate rate exceeds "
+                f"{settings.max_duplicate_ratio_warning:.0%} of the batch — check the upstream source."
+            )
+        return "\n".join(lines)
 
 
 def validate(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, ValidationSummary]:
@@ -127,17 +139,21 @@ def validate(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, ValidationSu
     valid_df[NUMERIC_COLUMNS] = valid_df[NUMERIC_COLUMNS].apply(pd.to_numeric)
     valid_df["Class"] = valid_df["Class"].astype(int)
 
+    duplicate_count = int(duplicate_mask.sum())
+    duplicate_ratio = (duplicate_count / total_rows) if total_rows else 0.0
+
     summary = ValidationSummary(
         total_rows=total_rows,
         valid_rows=len(valid_df),
         rejected_rows=int(reject_mask.sum()),
-        duplicate_rows=int(duplicate_mask.sum()),
+        duplicate_rows=duplicate_count,
         missing_value_rows=int(missing_mask.sum()),
         invalid_class_rows=int(invalid_class_mask.sum()),
         negative_amount_rows=int(negative_amount_mask.sum()),
         invalid_time_rows=int(invalid_time_mask.sum()),
         non_numeric_feature_rows=int(non_numeric_feature_mask.sum()),
         unexpected_columns=unexpected_columns,
+        high_duplicate_ratio=duplicate_ratio > settings.max_duplicate_ratio_warning,
     )
 
     return valid_df, rejected_df, summary
@@ -169,6 +185,14 @@ def run_validation(input_path: Path | None = None) -> ValidationSummary:
     )
     if summary.rejected_rows:
         log_event(logger, "records_rejected", rejected_rows=summary.rejected_rows)
+    if summary.high_duplicate_ratio:
+        log_event(
+            logger,
+            "high_duplicate_ratio_detected",
+            duplicate_rows=summary.duplicate_rows,
+            total_rows=summary.total_rows,
+            threshold=settings.max_duplicate_ratio_warning,
+        )
 
     return summary
 

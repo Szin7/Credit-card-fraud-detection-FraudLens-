@@ -75,6 +75,7 @@ def test_save_validation_result_persists_summary(session_factory):
         invalid_time_rows=0,
         non_numeric_feature_rows=0,
         unexpected_columns=[],
+        high_duplicate_ratio=False,
     )
     repo.save_validation_result("run-2", summary, session_factory=session_factory)
 

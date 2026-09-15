@@ -82,6 +82,28 @@ def test_duplicate_rows_are_rejected_keeping_the_first():
     assert summary.duplicate_rows == 1
 
 
+def test_high_duplicate_ratio_is_flagged_when_over_the_configured_threshold():
+    # 1 duplicate out of 2 rows = 50%, far above the default 5% warning
+    # threshold (config/settings.yaml > validation > max_duplicate_ratio_warning).
+    row = _base_row()
+    df = _frame(row, dict(row))
+    _, _, summary = validate(df)
+
+    assert summary.high_duplicate_ratio is True
+    assert "WARNING" in summary.as_text()
+
+
+def test_low_duplicate_ratio_is_not_flagged():
+    row = _base_row()
+    rows = [row] + [_base_row(Time=float(i)) for i in range(1, 25)] + [dict(row)]
+    df = _frame(*rows)  # 1 duplicate out of 26 rows = ~3.8%, under the threshold
+    _, _, summary = validate(df)
+
+    assert summary.duplicate_rows == 1
+    assert summary.high_duplicate_ratio is False
+    assert "WARNING" not in summary.as_text()
+
+
 def test_unexpected_columns_are_reported_but_not_fatal():
     df = _frame(_base_row())
     df["merchant_note"] = "unused"
