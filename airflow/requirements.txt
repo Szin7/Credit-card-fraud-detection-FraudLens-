@@ -1,0 +1,15 @@
+# Extra packages the DAGs need on top of the apache/airflow base image.
+# Deliberately NOT installed into the main requirements.txt / local venv —
+# Airflow pins a large, strict dependency tree that regularly conflicts
+# with app-level pandas/numpy/scikit-learn versions, so it only ever runs
+# inside this container. See docs/architecture.md.
+pandas==3.0.5
+numpy==2.5.3
+scikit-learn==1.9.1
+xgboost==3.4.1
+imbalanced-learn==0.14.2
+SQLAlchemy==2.0.53
+psycopg2-binary==2.9.13
+PyYAML==6.0.3
+python-dotenv==1.2.3
+joblib==1.6.0
