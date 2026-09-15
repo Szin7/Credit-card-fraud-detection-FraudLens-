@@ -22,9 +22,12 @@ data/rejected/*
 !data/processed/.gitkeep
 !data/rejected/.gitkeep
 
-# Trained model artifacts are build output, not source.
+# Trained model artifacts are build output, not source — real numbers from
+# actually running this code are quoted in docs/ instead of committing a
+# CSV/JSON snapshot that could silently drift from the current code.
 models/*.joblib
 models/*.json
+models/*.csv
 !models/.gitkeep
 
 # Logs
