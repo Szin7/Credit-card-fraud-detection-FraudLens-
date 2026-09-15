@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 import numpy as np
+import pandas as pd
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
@@ -98,3 +99,15 @@ def roc_curve_points(y_true: np.ndarray, y_proba: np.ndarray) -> dict:
         "tpr": tpr.tolist(),
         "thresholds": thresholds.tolist(),
     }
+
+
+def threshold_sweep(y_true: np.ndarray, y_proba: np.ndarray, thresholds: np.ndarray | None = None) -> pd.DataFrame:
+    """Precision/recall/F1/confusion-matrix counts at each candidate
+    decision threshold, so a threshold can be chosen by looking at the
+    actual tradeoff instead of defaulting to 0.5.
+    """
+    if thresholds is None:
+        thresholds = np.round(np.arange(0.05, 1.0, 0.05), 2)
+
+    rows = [compute_metrics(y_true, y_proba, threshold=float(t)).to_dict() for t in thresholds]
+    return pd.DataFrame(rows)

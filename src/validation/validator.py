@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from uuid import uuid4
 
 import pandas as pd
 
@@ -73,6 +74,13 @@ def validate(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, ValidationSu
     unexpected_columns = sorted(set(df.columns) - set(REQUIRED_COLUMNS))
     working = df.copy()
 
+    # The raw schema has no natural transaction identifier — mint one here,
+    # at the point a row first becomes a tracked record, so it's stable
+    # across rejected/valid rows and everything downstream (features,
+    # predictions, Postgres) can reference it consistently. A real upstream
+    # payment system would supply this instead; see docs/architecture.md.
+    working.insert(0, "transaction_id", [uuid4().hex for _ in range(len(working))])
+
     missing_mask = working[REQUIRED_COLUMNS].isna().any(axis=1)
 
     class_numeric = pd.to_numeric(working["Class"], errors="coerce")
@@ -115,7 +123,7 @@ def validate(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, ValidationSu
             lambda row: "; ".join(row.index[row.values]), axis=1
         )
 
-    valid_df = working.loc[~reject_mask, REQUIRED_COLUMNS].copy()
+    valid_df = working.loc[~reject_mask, ["transaction_id", *REQUIRED_COLUMNS]].copy()
     valid_df[NUMERIC_COLUMNS] = valid_df[NUMERIC_COLUMNS].apply(pd.to_numeric)
     valid_df["Class"] = valid_df["Class"].astype(int)
 

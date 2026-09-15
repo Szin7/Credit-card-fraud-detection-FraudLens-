@@ -12,9 +12,11 @@ paths:
 model:
   champion_filename: fraud_model.joblib
   metadata_filename: fraud_model_metadata.json
-  # Placeholder until Stage 5's threshold analysis writes the value that
-  # actually maximizes F1 on the validation set for the trained model.
-  decision_threshold: 0.50
+  # Chosen by scripts/optimize_threshold.py on the validation split: the
+  # threshold that maximizes F1 for the current champion model, which also
+  # happens to minimize the illustrative expected-cost metric at this
+  # model's precision/recall curve. Re-run that script after retraining.
+  decision_threshold: 0.60
 
 # UI risk categories shown on the dashboard — a separate concept from the
 # decision threshold above. A transaction can be labeled HIGH risk for a
