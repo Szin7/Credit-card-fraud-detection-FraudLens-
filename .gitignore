@@ -47,7 +47,8 @@ airflow/airflow.db
 # Docker
 postgres-data/
 
-# Editors / OS
+# Editors / OS / local dev tooling
+.claude/
 .vscode/
 .idea/
 .DS_Store
