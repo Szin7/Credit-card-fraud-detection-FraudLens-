@@ -41,5 +41,9 @@ jobs:
       - run: docker compose build dashboard airflow-scheduler
       - name: Validate DAG imports
         run: >-
-          docker compose run --rm --no-deps airflow-scheduler python -c
-          "from airflow.models import DagBag; b=DagBag('/opt/airflow/dags', include_examples=False); assert not b.import_errors, b.import_errors; assert len(b.dags)==2"
+          docker compose run --rm --no-deps
+          --entrypoint python
+          -e AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+          -e AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////tmp/airflow-ci.db
+          airflow-scheduler -c
+          "from airflow.models import DagBag; b=DagBag('/opt/airflow/dags', include_examples=False); assert not b.import_errors, b.import_errors; expected={'fraud_training_pipeline', 'fraud_inference_pipeline'}; assert set(b.dags)==expected, set(b.dags); print('Both DAGs imported successfully')"
