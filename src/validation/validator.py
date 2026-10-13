@@ -9,16 +9,18 @@ Amount) without the checks interfering with each other.
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from uuid import uuid4
+import numpy as np
+
+from src.validation.identity import feature_digest
+from src.utils.json_io import write_json
 
 import pandas as pd
 
 from src.utils.config import settings
 from src.utils.logging import get_logger, log_event
-from src.validation.schema import NUMERIC_COLUMNS, REQUIRED_COLUMNS, V_FEATURE_COLUMNS, VALID_CLASS_VALUES
+from src.validation.schema import INFERENCE_COLUMNS, NUMERIC_COLUMNS, REQUIRED_COLUMNS, V_FEATURE_COLUMNS, VALID_CLASS_VALUES
 
 logger = get_logger(__name__)
 
@@ -72,44 +74,45 @@ class ValidationSummary:
         return "\n".join(lines)
 
 
-def validate(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, ValidationSummary]:
+def validate(df: pd.DataFrame, require_target: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, ValidationSummary]:
     """Split `df` into (valid_rows, rejected_rows, summary).
 
     `rejected_rows` carries every original column plus `rejection_reason`.
     `valid_rows` is restricted to REQUIRED_COLUMNS with clean numeric dtypes.
     """
-    missing_columns = [c for c in REQUIRED_COLUMNS if c not in df.columns]
+    required = REQUIRED_COLUMNS if require_target else INFERENCE_COLUMNS
+    missing_columns = [c for c in required if c not in df.columns]
     if missing_columns:
         raise ValidationError(f"batch is missing required columns: {missing_columns}")
-
+    if df.empty:
+        raise ValidationError("batch contains no rows")
     total_rows = len(df)
-    unexpected_columns = sorted(set(df.columns) - set(REQUIRED_COLUMNS))
-    working = df.copy()
+    unexpected_columns = sorted(set(df.columns) - set(REQUIRED_COLUMNS) - {"transaction_id"})
+    working = df.copy().reset_index(drop=True)
+    supplied_ids = "transaction_id" in working.columns
+    if "Class" not in working:
+        working["Class"] = pd.NA
 
-    # The raw schema has no natural transaction identifier — mint one here,
-    # at the point a row first becomes a tracked record, so it's stable
-    # across rejected/valid rows and everything downstream (features,
-    # predictions, Postgres) can reference it consistently. A real upstream
-    # payment system would supply this instead; see docs/architecture.md.
-    working.insert(0, "transaction_id", [uuid4().hex for _ in range(len(working))])
-
-    missing_mask = working[REQUIRED_COLUMNS].isna().any(axis=1)
-
+    numeric = working[NUMERIC_COLUMNS].apply(pd.to_numeric, errors="coerce")
+    missing_mask = working[required].isna().any(axis=1)
     class_numeric = pd.to_numeric(working["Class"], errors="coerce")
-    invalid_class_mask = class_numeric.isna() | ~class_numeric.isin(VALID_CLASS_VALUES)
-
-    amount_numeric = pd.to_numeric(working["Amount"], errors="coerce")
-    negative_amount_mask = amount_numeric.isna() | (amount_numeric < 0)
-
-    time_numeric = pd.to_numeric(working["Time"], errors="coerce")
-    invalid_time_mask = time_numeric.isna() | (time_numeric < 0)
-
-    v_numeric = working[V_FEATURE_COLUMNS].apply(pd.to_numeric, errors="coerce")
-    # Present but unparseable (e.g. text in a V column) — distinct from an
-    # empty cell, which missing_mask already caught.
-    non_numeric_feature_mask = v_numeric.isna().any(axis=1) & working[V_FEATURE_COLUMNS].notna().all(axis=1)
-
-    duplicate_mask = working.duplicated(subset=REQUIRED_COLUMNS, keep="first")
+    invalid_class_mask = ~class_numeric.isin(VALID_CLASS_VALUES)
+    if not require_target:
+        invalid_class_mask &= working["Class"].notna()
+    amount_numeric = numeric["Amount"]
+    negative_amount_mask = ~np.isfinite(amount_numeric) | (amount_numeric < 0)
+    time_numeric = numeric["Time"]
+    invalid_time_mask = ~np.isfinite(time_numeric) | (time_numeric < 0)
+    non_numeric_feature_mask = ~np.isfinite(numeric[V_FEATURE_COLUMNS]).all(axis=1)
+    if supplied_ids:
+        ids = working["transaction_id"].astype("string").str.strip()
+        invalid_id_mask = ids.isna() | ids.eq("") | ids.str.len().gt(200)
+        working["transaction_id"] = ids
+        duplicate_mask = ids.duplicated(keep="first") & ~invalid_id_mask
+    else:
+        invalid_id_mask = pd.Series(False, index=working.index)
+        duplicate_mask = numeric.duplicated(keep="first")
+        working.insert(0, "transaction_id", pd.Series(index=working.index, dtype="string"))
 
     flags = pd.DataFrame(
         {
@@ -119,6 +122,7 @@ def validate(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, ValidationSu
             "invalid_time": invalid_time_mask,
             "non_numeric_feature_value": non_numeric_feature_mask,
             "duplicate_row": duplicate_mask,
+            "invalid_transaction_id": invalid_id_mask,
         },
         index=working.index,
     )
@@ -137,7 +141,9 @@ def validate(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, ValidationSu
 
     valid_df = working.loc[~reject_mask, ["transaction_id", *REQUIRED_COLUMNS]].copy()
     valid_df[NUMERIC_COLUMNS] = valid_df[NUMERIC_COLUMNS].apply(pd.to_numeric)
-    valid_df["Class"] = valid_df["Class"].astype(int)
+    valid_df["Class"] = pd.to_numeric(valid_df["Class"]).astype("Int64")
+    if not supplied_ids:
+        valid_df["transaction_id"] = valid_df.apply(feature_digest, axis=1) if not valid_df.empty else pd.Series(dtype="string")
 
     duplicate_count = int(duplicate_mask.sum())
     duplicate_ratio = (duplicate_count / total_rows) if total_rows else 0.0
@@ -159,22 +165,22 @@ def validate(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, ValidationSu
     return valid_df, rejected_df, summary
 
 
-def run_validation(input_path: Path | None = None) -> ValidationSummary:
+def run_validation(input_path: Path | None = None, *, require_target: bool = True, output_dir: Path | None = None) -> ValidationSummary:
     """Read the raw file, validate it, and persist valid/rejected splits
     plus a summary under data/processed and data/rejected.
     """
     path = Path(input_path) if input_path is not None else settings.raw_data_path
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, dtype={"transaction_id": "string"})
 
-    valid_df, rejected_df, summary = validate(df)
+    valid_df, rejected_df, summary = validate(df, require_target=require_target)
 
-    settings.processed_dir.mkdir(parents=True, exist_ok=True)
-    settings.rejected_dir.mkdir(parents=True, exist_ok=True)
-
-    valid_df.to_csv(settings.processed_dir / VALID_TRANSACTIONS_FILENAME, index=False)
-    rejected_df.to_csv(settings.rejected_dir / REJECTED_TRANSACTIONS_FILENAME, index=False)
-    with open(settings.processed_dir / VALIDATION_SUMMARY_FILENAME, "w", encoding="utf-8") as f:
-        json.dump(summary.to_dict(), f, indent=2)
+    processed = Path(output_dir) if output_dir is not None else settings.processed_dir
+    rejected = processed if output_dir is not None else settings.rejected_dir
+    processed.mkdir(parents=True, exist_ok=True)
+    rejected.mkdir(parents=True, exist_ok=True)
+    valid_df.to_csv(processed / VALID_TRANSACTIONS_FILENAME, index=False)
+    rejected_df.to_csv(rejected / REJECTED_TRANSACTIONS_FILENAME, index=False)
+    write_json(processed / VALIDATION_SUMMARY_FILENAME, summary.to_dict())
 
     log_event(
         logger,
@@ -202,9 +208,10 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Validate an ingested transaction CSV.")
     parser.add_argument("--input", type=Path, default=None, help="Path to the CSV file to validate.")
+    parser.add_argument("--inference", action="store_true", help="Allow missing ground-truth labels.")
     args = parser.parse_args()
 
-    summary = run_validation(args.input)
+    summary = run_validation(args.input, require_target=not args.inference)
     print(summary.as_text())
 
 

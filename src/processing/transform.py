@@ -22,7 +22,7 @@ TARGET_COLUMN = "Class"
 
 def load_processed_transactions(path: Path | None = None) -> pd.DataFrame:
     path = path or (settings.processed_dir / "transactions_valid.csv")
-    return pd.read_csv(path)
+    return pd.read_csv(path, dtype={"transaction_id": "string"})
 
 
 def model_frame(df: pd.DataFrame, include_target: bool = True) -> pd.DataFrame:

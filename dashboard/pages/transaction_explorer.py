@@ -20,10 +20,10 @@ with st.container(border=True):
         risk_filter = st.multiselect("Risk level", ["LOW", "REVIEW", "HIGH"], default=["HIGH", "REVIEW"])
         search_id = st.text_input("Transaction ID contains", placeholder="e.g. a1b2c3")
     with col2:
-        prob_range = st.slider("Fraud probability", 0.0, 1.0, (0.0, 1.0), step=0.01)
+        prob_range = st.slider("Model score", 0.0, 1.0, (0.0, 1.0), step=0.01)
     with col3:
-        min_amount = st.number_input("Min amount ($)", min_value=0.0, value=0.0, step=10.0)
-        max_amount = st.number_input("Max amount ($, 0 = no limit)", min_value=0.0, value=0.0, step=10.0)
+        min_amount = st.number_input("Min amount", min_value=0.0, value=0.0, step=10.0)
+        max_amount = st.number_input("Max amount (0 = no limit)", min_value=0.0, value=0.0, step=10.0)
 
 filters = dict(
     risk_levels=risk_filter or None,
@@ -82,9 +82,9 @@ with st.container(border=True):
         display_df[["transaction_id", "amount", "fraud_probability", "risk_level", "is_flagged", "prediction_timestamp"]],
         column_config={
             "transaction_id": st.column_config.TextColumn("Transaction"),
-            "amount": st.column_config.NumberColumn("Amount", format="$%.2f"),
+            "amount": st.column_config.NumberColumn("Amount", format="%.2f"),
             "fraud_probability": st.column_config.ProgressColumn(
-                "Probability", min_value=0.0, max_value=1.0, format="%.3f"
+                "Model score", min_value=0.0, max_value=1.0, format="%.3f"
             ),
             "risk_level": st.column_config.TextColumn("Risk"),
             "is_flagged": st.column_config.CheckboxColumn("Flagged"),
@@ -117,9 +117,9 @@ with st.container(border=True):
                 st.markdown("**Transaction ID**")
                 st.code(detail["transaction_id"], language=None)
                 st.markdown("**Amount**")
-                st.write(f"${detail['amount']:.2f}")
+                st.write(f"{detail['amount']:.2f}")
             with d2:
-                st.markdown("**Fraud Probability**")
+                st.markdown("**Model Score**")
                 st.write(f"{detail['fraud_probability']:.4f}")
                 st.markdown("**Risk Classification**")
                 st.markdown(risk_badge_html(detail["risk_level"]), unsafe_allow_html=True)

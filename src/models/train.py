@@ -1,32 +1,8 @@
-"""Train and compare fraud models on the validated transaction set.
-
-Split strategy: stratified random train/val/test (64/16/20), not
-chronological. The dataset spans only ~48 hours with no calendar/seasonal
-structure, and with fraud under 1% of rows, a chronological cut risks
-starving val/test of positive examples depending on which hours land where.
-Stratified splitting keeps the fraud ratio stable across all three sets,
-which matters more here than simulating a train-on-past/test-on-future
-production setup. See docs/model_card.md for the full reasoning, and
-docs/architecture.md for why this would change with a longer-history
-dataset.
-
-Imbalance handling: every model except one uses class weighting
-(LogisticRegression's / RandomForest's `class_weight="balanced"`, XGBoost's
-`scale_pos_weight`) — it needs no extra library and can't leak between
-folds. SMOTE is compared head-to-head against class weighting on the same
-base model (Logistic Regression) via an imblearn Pipeline (not sklearn's —
-sklearn's Pipeline doesn't support a resampling step that changes row
-counts), fit only on the training fold, so the comparison table shows
-whether oversampling earns its added complexity rather than assuming it
-does.
-
-Validation selects the champion (by PR-AUC); the test set is touched
-exactly once, to report the champion's final numbers.
-"""
-
+"""Compare candidates on validation data and evaluate the selected model on holdout data."""
 from __future__ import annotations
 
-import json
+import hashlib
+from uuid import uuid4
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,6 +21,8 @@ from xgboost import XGBClassifier
 from src.features.build_features import build_feature_pipeline
 from src.models.evaluate import compute_metrics, precision_recall_curve_points, roc_curve_points, threshold_sweep
 from src.models.explain import get_feature_importance, get_shap_importance
+from src.models.artifacts import publish_release
+from src.utils.json_io import write_json
 from src.processing.transform import FEATURE_COLUMNS, TARGET_COLUMN, load_processed_transactions
 from src.utils.config import settings
 from src.utils.logging import get_logger, log_event
@@ -59,7 +37,22 @@ def load_training_data(path: Path | None = None) -> pd.DataFrame:
     return load_processed_transactions(path)
 
 
-def split_data(df: pd.DataFrame, seed: int):
+def split_data(df: pd.DataFrame, seed: int, strategy: str = "stratified"):
+    if "Class" not in df or df.Class.isna().any() or set(df.Class.unique()) != {0, 1}:
+        raise ValueError("Training requires nonmissing binary labels and both classes")
+    if strategy == "chronological":
+        # Keep transactions with equal timestamps in the same partition.
+        times = sorted(df.Time.unique())
+        if len(times) < 3:
+            raise ValueError("Chronological split needs at least three distinct timestamps")
+        first = times[max(1, int(len(times) * 0.64))]
+        second = times[min(len(times) - 1, max(2, int(len(times) * 0.80)))]
+        parts = [df[df.Time < first], df[(df.Time >= first) & (df.Time < second)], df[df.Time >= second]]
+        if any(set(part.Class.unique()) != {0, 1} for part in parts):
+            raise ValueError("Every chronological partition needs both classes; provide more labeled history")
+        return *(p[FEATURE_COLUMNS] for p in parts), *(p[TARGET_COLUMN] for p in parts)
+    if strategy != "stratified":
+        raise ValueError(f"Unknown split strategy: {strategy}")
     X = df[FEATURE_COLUMNS]
     y = df[TARGET_COLUMN]
 
@@ -135,9 +128,11 @@ class TrainedModel:
     val_metrics: dict
 
 
-def train_and_compare(seed: int = settings.random_seed):
-    df = load_training_data()
-    X_train, X_val, X_test, y_train, y_val, y_test = split_data(df, seed)
+def train_and_compare(seed: int = settings.random_seed, input_path: Path | None = None, strategy: str = "stratified"):
+    df = load_training_data(input_path)
+    X_train, X_val, X_test, y_train, y_val, y_test = split_data(df, seed, strategy)
+    if y_train.value_counts().min() < 6:
+        raise ValueError("Each training class needs at least six examples for SMOTE")
 
     scale_pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1)
 
@@ -178,23 +173,25 @@ def select_champion(trained: list[TrainedModel]) -> TrainedModel:
     return max(candidates, key=lambda t: t.val_metrics["pr_auc"])
 
 
-def main() -> None:
+def train_release(input_path: Path | None = None, *, strategy: str = "stratified", dataset_kind: str = "unknown", source_checksum: str | None = None) -> Path:
     settings.model_dir.mkdir(parents=True, exist_ok=True)
 
-    trained, comparison_df, (X_val, y_val), (X_test, y_test) = train_and_compare()
-    comparison_df.to_csv(settings.model_dir / "model_comparison.csv", index=False)
+    trained, comparison_df, (X_val, y_val), (X_test, y_test) = train_and_compare(input_path=input_path, strategy=strategy)
+    release = settings.model_dir / "releases" / uuid4().hex
+    release.mkdir(parents=True)
+    comparison_df.to_csv(release / "model_comparison.csv", index=False)
 
     champion = select_champion(trained)
     val_proba = champion.pipeline.predict_proba(X_val)[:, 1]
+    # Select the threshold before computing any holdout metrics.
+    selection = threshold_sweep(y_val.to_numpy(), val_proba)
+    chosen_threshold = float(selection.sort_values(["f1", "precision", "threshold"], ascending=[False, False, False]).iloc[0]["threshold"])
     test_proba = champion.pipeline.predict_proba(X_test)[:, 1]
-    test_metrics = compute_metrics(y_test.to_numpy(), test_proba, threshold=settings.decision_threshold)
+    test_metrics = compute_metrics(y_test.to_numpy(), test_proba, threshold=chosen_threshold)
 
-    joblib.dump(champion.pipeline, settings.model_path)
+    joblib.dump(champion.pipeline, release / "model.joblib")
 
-    # Threshold sweep on the validation set (never test) for the dashboard's
-    # interactive threshold-tradeoff table — see scripts/optimize_threshold.py,
-    # which computes the same thing standalone for a human reviewing whether
-    # to change config/settings.yaml's decision_threshold.
+    # Persist validation tradeoffs for review without rereading a different dataset.
     val_sweep = threshold_sweep(y_val.to_numpy(), val_proba)
     val_sweep["expected_cost"] = [
         settings.cost_model.expected_cost(int(fn), int(fp))
@@ -212,7 +209,15 @@ def main() -> None:
         "model_type": champion.name,
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "random_seed": settings.random_seed,
-        "decision_threshold": settings.decision_threshold,
+        "decision_threshold": chosen_threshold,
+        "threshold_policy": "maximum validation F1; tie-break precision, then higher threshold",
+        "risk_bands": {"low_max": settings.risk_bands.low_max, "review_max": settings.risk_bands.review_max},
+        "split_strategy": strategy,
+        "dataset_kind": dataset_kind,
+        "source_checksum_sha256": source_checksum,
+        "validation_rows": len(y_val), "validation_fraud": int(y_val.sum()),
+        "test_rows": len(y_test), "test_fraud": int(y_test.sum()),
+        "artifact_sha256": hashlib.sha256((release / "model.joblib").read_bytes()).hexdigest(),
         "feature_columns": FEATURE_COLUMNS,
         "validation_metrics": champion.val_metrics,
         "test_metrics": test_metrics.to_dict(),
@@ -222,8 +227,8 @@ def main() -> None:
         "model_comparison": comparison_df.to_dict(orient="records"),
         "feature_importance": {"native": native_importance, "shap": shap_importance},
     }
-    with open(settings.model_metadata_path, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
+    write_json(release / "metadata.json", metadata)
+    val_sweep.to_csv(release / "threshold_analysis.csv", index=False)
 
     log_event(
         logger,
@@ -237,6 +242,19 @@ def main() -> None:
     print(f"\nChampion (by validation PR-AUC): {champion.name}")
     print(f"Test PR-AUC: {test_metrics.pr_auc:.4f}   Test ROC-AUC: {test_metrics.roc_auc:.4f}")
     print(f"Test precision: {test_metrics.precision:.4f}   Test recall: {test_metrics.recall:.4f}")
+
+    return release
+
+
+def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path)
+    parser.add_argument("--split", choices=["stratified", "chronological"], default="stratified")
+    parser.add_argument("--dataset-kind", choices=["synthetic", "real", "unknown"], default="unknown")
+    args = parser.parse_args()
+    release = train_release(args.input, strategy=args.split, dataset_kind=args.dataset_kind)
+    publish_release(release)
 
 
 if __name__ == "__main__":

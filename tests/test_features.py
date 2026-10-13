@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.features.build_features import build_feature_pipeline
 from src.validation.schema import V_FEATURE_COLUMNS

@@ -56,3 +56,14 @@ Thumbs.db
 
 # Notebook execution scratch
 notebooks/.ipynb_checkpoints/
+
+# Local batch snapshots and model releases
+models/releases/
+models/.training.lock
+data/incoming/*
+!data/incoming/.gitkeep
+.coverage
+coverage.xml
+.ruff_cache/
+
+.local/

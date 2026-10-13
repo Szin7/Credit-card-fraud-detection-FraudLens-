@@ -18,3 +18,8 @@ notebooks
 airflow/logs
 docs
 *.md
+
+models/releases
+data/incoming
+.coverage
+.ruff_cache

@@ -43,7 +43,7 @@ if stats["total_transactions"] == 0:
 
 kpi_row(
     [
-        {"label": "Total Transactions", "value": f"{stats['total_transactions']:,}"},
+        {"label": "Stored Predictions", "value": f"{stats['total_transactions']:,}"},
         {"label": "Flagged", "value": f"{stats['flagged_count']:,}"},
         {"label": "Flagged Rate", "value": f"{stats['flagged_rate']:.2%}"},
         {"label": "Avg. Risk Score", "value": f"{stats['avg_probability']:.3f}"},
@@ -54,7 +54,7 @@ st.write("")
 with st.container(border=True):
     st.subheader("Transaction Risk Over Time")
     st.markdown(
-        '<div class="fl-section-caption">Transaction volume and average fraud probability, '
+        '<div class="fl-section-caption">Stored prediction volume and average model score, '
         "by hour since the first transaction in this batch.</div>",
         unsafe_allow_html=True,
     )
@@ -67,7 +67,7 @@ with st.container(border=True):
             go.Bar(
                 x=trend["hour_bucket"],
                 y=trend["transaction_count"],
-                name="Transactions",
+                name="Predictions",
                 marker_color=COLORS["accent_soft"],
                 marker_line_color=COLORS["border"],
                 marker_line_width=1,
@@ -78,15 +78,15 @@ with st.container(border=True):
             go.Scatter(
                 x=trend["hour_bucket"],
                 y=trend["avg_probability"],
-                name="Avg. fraud probability",
+                name="Avg. model score",
                 mode="lines+markers",
                 line=dict(color=COLORS["accent"], width=2.5),
                 marker=dict(size=5),
             ),
             secondary_y=True,
         )
-        fig.update_yaxes(title_text="Transactions", secondary_y=False)
-        fig.update_yaxes(title_text="Avg. fraud probability", secondary_y=True, range=[0, 1])
+        fig.update_yaxes(title_text="Predictions", secondary_y=False)
+        fig.update_yaxes(title_text="Avg. model score", secondary_y=True, range=[0, 1])
         fig.update_xaxes(title_text="Hour since first transaction")
         fig = apply_chart_theme(fig, height=360)
         st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
@@ -111,7 +111,7 @@ with col1:
                 textposition="outside",
             )
         )
-        fig.update_xaxes(title_text="Transactions")
+        fig.update_xaxes(title_text="Predictions")
         fig = apply_chart_theme(fig, height=260)
         st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
@@ -132,7 +132,7 @@ with col2:
                 )
             )
             fig.update_xaxes(title_text="Hour since first transaction")
-            fig.update_yaxes(title_text="Transactions")
+            fig.update_yaxes(title_text="Predictions")
             fig = apply_chart_theme(fig, height=260)
             st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
@@ -148,9 +148,9 @@ with st.container(border=True):
             display_df[["transaction_id", "amount", "fraud_probability", "risk_level", "prediction_timestamp"]],
             column_config={
                 "transaction_id": st.column_config.TextColumn("Transaction"),
-                "amount": st.column_config.NumberColumn("Amount", format="$%.2f"),
+                "amount": st.column_config.NumberColumn("Amount", format="%.2f"),
                 "fraud_probability": st.column_config.ProgressColumn(
-                    "Probability", min_value=0.0, max_value=1.0, format="%.3f"
+                    "Model score", min_value=0.0, max_value=1.0, format="%.3f"
                 ),
                 "risk_level": st.column_config.TextColumn("Risk"),
                 "prediction_timestamp": st.column_config.DatetimeColumn("Predicted At", format="YYYY-MM-DD HH:mm"),

@@ -97,7 +97,7 @@ def roc_curve_points(y_true: np.ndarray, y_proba: np.ndarray) -> dict:
     return {
         "fpr": fpr.tolist(),
         "tpr": tpr.tolist(),
-        "thresholds": thresholds.tolist(),
+        "thresholds": [float(t) if np.isfinite(t) else None for t in thresholds],
     }
 
 

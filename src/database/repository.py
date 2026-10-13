@@ -19,6 +19,9 @@ from sqlalchemy.orm import sessionmaker
 from src.database.connection import session_scope
 from src.database.models import FraudPrediction, ModelRun, PipelineRun, Transaction, ValidationResult
 from src.validation.validator import ValidationSummary
+from src.validation.identity import feature_digest
+from src.validation.schema import INFERENCE_COLUMNS
+from src.utils.json_io import json_safe
 
 # ---------------------------------------------------------------------------
 # Writers
@@ -75,54 +78,98 @@ def save_validation_result(
         )
 
 
-def save_transactions(df: pd.DataFrame, source_run_id: str, session_factory: sessionmaker | None = None) -> int:
-    """Insert one row per transaction. `df` must have transaction_id, Time,
-    Amount, and Class columns (the shape of transactions_valid.csv).
-    """
+def _insert_once(session, table, rows, key_columns):
+    if not rows:
+        return 0
+    dialect = session.bind.dialect.name
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    elif dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
+    else:
+        raise ValueError(f"Unsupported database dialect: {dialect}")
+    count = 0
+    # Bound parameter counts also work on SQLite builds with a low limit.
+    for start in range(0, len(rows), 50):
+        statement = insert(table).values(rows[start:start + 50])
+        result = session.execute(statement.on_conflict_do_nothing(index_elements=key_columns))
+        count += max(result.rowcount, 0)
+    return count
+
+
+def _transaction_rows(df, source_run_id):
     now = datetime.now(timezone.utc)
-    with session_scope(session_factory) as session:
-        session.add_all(
-            [
-                Transaction(
-                    transaction_id=row.transaction_id,
-                    time_elapsed=float(row.Time),
-                    amount=float(row.Amount),
-                    actual_class=int(row.Class),
-                    source_run_id=source_run_id,
-                    ingested_at=now,
-                )
-                for row in df.itertuples()
-            ]
-        )
-    return len(df)
+    rows = []
+    has_features = set(INFERENCE_COLUMNS).issubset(df.columns)
+    for row in df.to_dict(orient="records"):
+        label = row.get("Class")
+        rows.append(dict(
+            transaction_id=str(row["transaction_id"]),
+            content_hash=feature_digest(row) if has_features else None,
+            time_elapsed=float(row["Time"]), amount=float(row["Amount"]),
+            actual_class=None if pd.isna(label) else int(label),
+            source_run_id=source_run_id, ingested_at=now,
+        ))
+    return rows
 
 
-def save_predictions(df: pd.DataFrame, session_factory: sessionmaker | None = None) -> int:
-    """Insert one row per prediction. `df` must match the shape returned by
-    src.models.predict.generate_predictions().
-    """
+def _persist_transactions(session, rows):
+    inserted = _insert_once(session, Transaction.__table__, rows, ["transaction_id"])
+    # An upstream ID must never silently refer to different feature values.
+    for start in range(0, len(rows), 300):
+        batch = rows[start:start + 300]
+        stored = {r.transaction_id: r for r in session.scalars(
+            select(Transaction).where(Transaction.transaction_id.in_([r["transaction_id"] for r in batch]))
+        )}
+        for row in batch:
+            old = stored[row["transaction_id"]]
+            if (float(old.time_elapsed) != row["time_elapsed"] or float(old.amount) != row["amount"]
+                    or (old.content_hash and row["content_hash"] and old.content_hash != row["content_hash"])):
+                raise ValueError(f"Transaction ID reused with different features: {row['transaction_id']}")
+            if old.actual_class is not None and row["actual_class"] is not None and old.actual_class != row["actual_class"]:
+                raise ValueError(f"Conflicting label for transaction: {row['transaction_id']}")
+            if old.actual_class is None and row["actual_class"] is not None:
+                old.actual_class = row["actual_class"]
+    return inserted
+
+
+def _prediction_rows(df):
+    return [dict(
+        transaction_id=str(row.transaction_id), fraud_probability=float(row.fraud_probability),
+        risk_level=row.risk_level, is_flagged=bool(row.is_flagged), model_version=row.model_version,
+        threshold=float(row.threshold), prediction_timestamp=pd.Timestamp(row.prediction_timestamp).to_pydatetime(),
+    ) for row in df.itertuples()]
+
+
+def save_transactions(df, source_run_id, session_factory=None):
     with session_scope(session_factory) as session:
-        session.add_all(
-            [
-                FraudPrediction(
-                    transaction_id=row.transaction_id,
-                    fraud_probability=float(row.fraud_probability),
-                    risk_level=row.risk_level,
-                    is_flagged=bool(row.is_flagged),
-                    model_version=row.model_version,
-                    threshold=float(row.threshold),
-                    prediction_timestamp=pd.Timestamp(row.prediction_timestamp).to_pydatetime(),
-                )
-                for row in df.itertuples()
-            ]
-        )
-    return len(df)
+        return _persist_transactions(session, _transaction_rows(df, source_run_id))
+
+
+def save_predictions(df, session_factory=None):
+    with session_scope(session_factory) as session:
+        return _insert_once(session, FraudPrediction.__table__, _prediction_rows(df),
+                            ["transaction_id", "model_version", "threshold"])
+
+
+def save_scored_batch(transactions, predictions, source_run_id, session_factory=None):
+    """Commit transactions and predictions together; replay is a no-op."""
+    if set(transactions.transaction_id) != set(predictions.transaction_id):
+        raise ValueError("Every transaction must have exactly one prediction")
+    if predictions.transaction_id.duplicated().any():
+        raise ValueError("Duplicate prediction IDs")
+    with session_scope(session_factory) as session:
+        tx_count = _persist_transactions(session, _transaction_rows(transactions, source_run_id))
+        prediction_count = _insert_once(session, FraudPrediction.__table__, _prediction_rows(predictions),
+                                       ["transaction_id", "model_version", "threshold"])
+    return {"transactions_inserted": tx_count, "predictions_inserted": prediction_count}
 
 
 def save_model_run(metadata: dict, session_factory: sessionmaker | None = None) -> None:
     """Persist a trained model's metrics/curves and mark it champion,
     unsetting any previous champion in the same transaction.
     """
+    metadata = json_safe(metadata)
     with session_scope(session_factory) as session:
         session.query(ModelRun).filter(ModelRun.is_champion.is_(True)).update({"is_champion": False})
 
@@ -148,6 +195,11 @@ def save_model_run(metadata: dict, session_factory: sessionmaker | None = None) 
                     "validation_metrics": val_metrics,
                     "threshold_sweep": metadata.get("threshold_sweep", []),
                     "feature_importance": metadata.get("feature_importance", {"native": [], "shap": None}),
+                    "dataset_kind": metadata.get("dataset_kind", "unknown"),
+                    "split_strategy": metadata.get("split_strategy", "unknown"),
+                    "test_rows": metadata.get("test_rows"),
+                    "test_fraud": metadata.get("test_fraud"),
+                    "source_checksum_sha256": metadata.get("source_checksum_sha256"),
                     "test_confusion_matrix": {
                         "true_negatives": test_metrics["true_negatives"],
                         "false_positives": test_metrics["false_positives"],
@@ -344,6 +396,7 @@ def get_transaction_detail(transaction_id: str, session_factory: sessionmaker | 
             )
             .join(FraudPrediction, FraudPrediction.transaction_id == Transaction.transaction_id)
             .where(Transaction.transaction_id == transaction_id)
+            .order_by(FraudPrediction.prediction_timestamp.desc(), FraudPrediction.prediction_id.desc())
         ).first()
 
     return dict(row._mapping) if row is not None else None

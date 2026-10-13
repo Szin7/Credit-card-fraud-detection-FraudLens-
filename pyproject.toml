@@ -1,0 +1,11 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = ["notebooks", ".venv"]
+
+[tool.ruff.lint]
+select = ["E9", "F"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires TEST_DATABASE_URL pointing at a disposable PostgreSQL database"]

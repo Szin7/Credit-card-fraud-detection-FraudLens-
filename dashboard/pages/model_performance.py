@@ -27,12 +27,19 @@ except Exception as exc:  # noqa: BLE001
 if champion is None:
     render_empty_state(
         "No trained model registered yet",
-        "Run the training pipeline to populate this page: `make train` (or trigger "
+        "Run the training pipeline to populate this page: `make pipeline` (or trigger "
         "fraud_training_pipeline in Airflow).",
     )
     st.stop()
 
 curve_data = champion["curve_data"]
+kind = curve_data.get("dataset_kind", "unknown")
+if kind == "synthetic":
+    st.warning("Synthetic demonstration data. These metrics do not establish real-world fraud detection performance.")
+else:
+    st.caption(f"Dataset provenance: {kind}. Split: {curve_data.get('split_strategy', 'unknown')}.")
+if curve_data.get("test_fraud") is not None:
+    st.caption(f"Holdout: {curve_data['test_rows']:,} transactions; {curve_data['test_fraud']:,} fraud examples.")
 
 st.markdown(
     f"**Champion:** `{champion['model_type']}`  &nbsp;|&nbsp;  "

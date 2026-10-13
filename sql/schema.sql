@@ -46,6 +46,7 @@ CREATE INDEX IF NOT EXISTS idx_validation_results_pipeline_run_id ON validation_
 -- Transaction-level summary for the app/serving layer.
 CREATE TABLE IF NOT EXISTS transactions (
     transaction_id      TEXT PRIMARY KEY,
+    content_hash        TEXT,
     time_elapsed         NUMERIC NOT NULL,
     amount               NUMERIC NOT NULL,
     -- Ground-truth label, when known (this is historical/backtested data).
@@ -97,7 +98,8 @@ CREATE TABLE IF NOT EXISTS fraud_predictions (
     is_flagged               BOOLEAN NOT NULL,
     model_version            TEXT NOT NULL,
     threshold                NUMERIC NOT NULL,
-    prediction_timestamp     TIMESTAMPTZ NOT NULL DEFAULT now()
+    prediction_timestamp     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_prediction_decision UNIQUE (transaction_id, model_version, threshold)
 );
 
 CREATE INDEX IF NOT EXISTS idx_fraud_predictions_transaction_id ON fraud_predictions (transaction_id);

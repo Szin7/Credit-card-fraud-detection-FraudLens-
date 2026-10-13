@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(os.environ.get("FRAUDLENS_ROOT", Path(__file__).resolve().parents[2]))
 SETTINGS_PATH = PROJECT_ROOT / "config" / "settings.yaml"
 
 load_dotenv(PROJECT_ROOT / ".env")

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,7 +27,7 @@ import pandas as pd
 
 from src.utils.config import settings
 from src.utils.logging import get_logger, log_event
-from src.validation.schema import REQUIRED_COLUMNS
+from src.validation.schema import REQUIRED_COLUMNS, INFERENCE_COLUMNS
 
 logger = get_logger(__name__)
 
@@ -68,7 +69,7 @@ def _read_csv(path: Path) -> pd.DataFrame:
         raise IngestionError(f"could not parse '{path}' as CSV: {exc}") from exc
 
 
-def ingest(input_path: Path | None = None) -> IngestionResult:
+def ingest(input_path: Path | None = None, *, require_target: bool = True, output_dir: Path | None = None) -> IngestionResult:
     path = Path(input_path) if input_path is not None else settings.raw_data_path
 
     log_event(logger, "pipeline_started", stage="ingestion", source_path=str(path))
@@ -78,11 +79,18 @@ def ingest(input_path: Path | None = None) -> IngestionResult:
     if path.stat().st_size == 0:
         raise IngestionError(f"input file is empty: {path}")
 
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=False)
+        snapshot = output_dir / "source.csv"
+        shutil.copyfile(path, snapshot)
+        path = snapshot
+
     df = _read_csv(path)
     if df.empty:
         raise IngestionError(f"input file has no rows: {path}")
 
-    missing_columns = [c for c in REQUIRED_COLUMNS if c not in df.columns]
+    required = REQUIRED_COLUMNS if require_target else INFERENCE_COLUMNS
+    missing_columns = [c for c in required if c not in df.columns]
     if missing_columns:
         raise IngestionError(f"input file is missing required columns: {missing_columns}")
 
@@ -95,7 +103,7 @@ def ingest(input_path: Path | None = None) -> IngestionResult:
 
         upload_file(path, f"raw/{run_id}/{path.name}")
 
-    manifests_dir = settings.raw_dir / "manifests"
+    manifests_dir = output_dir if output_dir is not None else settings.raw_dir / "manifests"
     manifests_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = manifests_dir / f"{run_id}.json"
 

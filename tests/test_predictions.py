@@ -61,8 +61,7 @@ def _tiny_fitted_pipeline() -> tuple[Pipeline, pd.DataFrame]:
 
 def test_generate_predictions_output_schema(monkeypatch):
     pipeline, X = _tiny_fitted_pipeline()
-    monkeypatch.setattr(predict_module, "load_model", lambda: pipeline)
-    monkeypatch.setattr(predict_module, "load_model_version", lambda: "test-model@2024-01-01")
+    monkeypatch.setattr(predict_module, "load_bundle", lambda: (pipeline, {"model_type": "test-model", "trained_at": "2024-01-01", "decision_threshold": settings.decision_threshold}))
 
     df = X.copy()
     df.insert(0, "transaction_id", [f"tx-{i}" for i in range(len(df))])
@@ -89,13 +88,12 @@ def test_generate_predictions_output_schema(monkeypatch):
 
 def test_is_flagged_matches_configured_decision_threshold(monkeypatch):
     pipeline, X = _tiny_fitted_pipeline()
-    monkeypatch.setattr(predict_module, "load_model", lambda: pipeline)
-    monkeypatch.setattr(predict_module, "load_model_version", lambda: "test-model")
+    monkeypatch.setattr(predict_module, "load_bundle", lambda: (pipeline, {"model_type": "test-model", "trained_at": "2024-01-01", "decision_threshold": 0.83}))
 
     df = X.copy()
     df.insert(0, "transaction_id", [f"tx-{i}" for i in range(len(df))])
 
     predictions = predict_module.generate_predictions(df=df)
 
-    expected_flags = predictions["fraud_probability"] >= settings.decision_threshold
+    expected_flags = predictions["fraud_probability"] >= 0.83
     pd.testing.assert_series_equal(predictions["is_flagged"], expected_flags, check_names=False)

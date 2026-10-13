@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, CheckConstraint, ForeignKey
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -52,6 +52,7 @@ class Transaction(Base):
     __table_args__ = (CheckConstraint("actual_class IN (0,1)", name="ck_transactions_actual_class"),)
 
     transaction_id: Mapped[str] = mapped_column(primary_key=True)
+    content_hash: Mapped[str | None] = mapped_column(default=None)
     time_elapsed: Mapped[float]
     amount: Mapped[float]
     actual_class: Mapped[int | None] = mapped_column(default=None)
@@ -91,6 +92,7 @@ class ModelRun(Base):
 class FraudPrediction(Base):
     __tablename__ = "fraud_predictions"
     __table_args__ = (
+        UniqueConstraint("transaction_id", "model_version", "threshold", name="uq_prediction_decision"),
         CheckConstraint("fraud_probability BETWEEN 0 AND 1", name="ck_fraud_predictions_probability_range"),
         CheckConstraint("risk_level IN ('LOW','REVIEW','HIGH')", name="ck_fraud_predictions_risk_level"),
     )
