@@ -1,27 +1,39 @@
-# Résumé notes
+# Explaining FraudLens in an interview
 
-Use only claims you can demonstrate and explain yourself. Adapt these bullets to
-your own contribution and the verification you complete.
+Use only statements that match the work you can demonstrate and explain. The examples here describe verified project capabilities, not a claim of experience running a live fraud-prevention service.
 
-- Developed a batch fraud-scoring workflow with schema validation, isolated input
-  snapshots, versioned model artifacts, and a four-page Streamlit dashboard.
-- Added replay-safe transaction identity and atomic database writes, allowing
-  unlabeled batches to be scored and retried without duplicate prediction decisions.
-- Compared five classification candidates using validation average precision and
-  validation-only threshold selection; evaluated the selected model on a synthetic
-  holdout and documented the dataset's limits.
+## Short project description
 
-After the GitHub workflow passes, you can add CI with PostgreSQL integration tests
-and container builds. After running Docker, you can describe the Airflow deployment
-as demonstrated. Add real-data metrics only after running and recording that experiment.
+FraudLens is a credit-card fraud-detection research and batch-processing project. It compares classifiers on an imbalanced transaction dataset, saves a versioned model, scores new unlabeled batches and presents the decisions in a Streamlit dashboard. A Docker-based Airflow pipeline and PostgreSQL database handle the containerized workflow.
 
-Avoid claiming production deployment, real-time scoring, calibrated risk estimates,
-AWS operation, or real-world fraud reduction: these are not established by this project.
+## Evidence you can discuss
 
-## Thirty-second explanation
+- Compared five classifiers using validation average precision on the ULB/Kaggle credit-card dataset; selected XGBoost with a 0.95 validation-selected threshold.
+- Evaluated the frozen model on 59,888 chronologically held-out transactions: precision **88.52%**, recall **71.05%** and F1 **78.83%** (54 true positives, 7 false positives and 22 false negatives).
+- Used a local SQLite database and four Streamlit pages to demonstrate predictions from 3,076 deliberately fraud-enriched holdout-feature rows. That sample is a dashboard demonstration, **not** another independent accuracy estimate.
+- Verified the saved Kaggle-trained XGBoost release inside a GitHub-hosted Docker/Airflow/PostgreSQL workflow, scoring 6,080 synthetic integration-test rows and confirming that replay introduced no duplicate decisions.
+- Maintained tests, linting, container builds, DAG validation and runbooks in GitHub.
 
-FraudLens processes transaction CSVs and scores them for review. The engineering
-work is in validating bad rows, keeping training and inference preprocessing
-consistent, choosing thresholds without using the test labels, and making batch
-retries safe. I can demonstrate it locally with synthetic data. The next validation
-step is a real-data chronological benchmark and the full container acceptance run.
+Adapt these points to the responsibilities you actually held. In particular, be ready to explain how input validation, threshold selection, persistence and replay protection work in code.
+
+## Demonstration order
+
+1. Describe the problem of rare fraud cases and why accuracy alone is misleading.
+2. Explain the chronological split, validation-only model and threshold selection, and untouched test partition.
+3. Open the Streamlit Overview and Transaction Explorer pages, then Model Performance and Pipeline Health.
+4. Show how the model release is imported into Docker and used by Airflow without retraining.
+5. Open the successful CI and real-model acceptance runs, then discuss limits and possible improvements.
+
+## Common follow-up questions
+
+**Why XGBoost?** It had the highest validation average precision among the five evaluated candidates. The final holdout results were calculated only after selection.
+
+**Why a 0.95 threshold?** That threshold maximized validation F1 over the implemented search grid; it is not an approved operational banking threshold.
+
+**Why both SQLite and PostgreSQL?** SQLite makes local demonstrations and tests easier. PostgreSQL is used for the Docker/Airflow integration and dashboard database checks.
+
+**How is duplicate scoring avoided?** Prediction decisions have a unique key combining transaction identity, model version and threshold. Replaying the same batch does not insert another identical decision.
+
+**Is it production-ready?** No. The application uses batch scoring and an anonymized research dataset; a live service would need access control, monitoring, privacy controls, threshold governance, retention policies and validation against future data.
+
+For deeper walkthroughs, see the [interview guide](interview_guide.md), [architecture](architecture.md) and [real-data model card](real_model_card.md).
