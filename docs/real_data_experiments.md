@@ -76,7 +76,7 @@ The experiment completed on Kaggle CPU using Python 3.12.15. From 284,807 source
 
 The trained model was exported, checksum-verified, imported into WSL and used successfully in a local batch/SQLite/Streamlit check. A deliberately enriched dashboard sample contained 3,076 holdout-feature rows and led to 54 flags; it is **not an independent performance evaluation**.
 
-See [`real_model_card.md`](real_model_card.md) for interpretation and [`results/real-data-benchmark.json`](results/real-data-benchmark.json) for recorded values. The Docker/Airflow end-to-end test remains open.
+See [`real_model_card.md`](real_model_card.md) for interpretation and [`results/real-data-benchmark.json`](results/real-data-benchmark.json) for recorded values. The Docker/Airflow end-to-end test passed on a GitHub-hosted runner using synthetic inputs. The real-data benchmark and local inference evaluation remain separate.
 
 ## Discussion prompts
 

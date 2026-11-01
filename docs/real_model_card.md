@@ -60,6 +60,6 @@ The deliberately enriched 3,076-row sample is for demonstrating the batch dashbo
 
 This is a research and portfolio demonstration, not a live payment-authorization service. The dataset spans a short period and contains no cardholder, merchant, or device identifiers for group-based evaluation. We have not measured long-term drift, deployment performance, or probability calibration. At 0.95, false negatives may matter substantially; a real operational threshold would require an explicit review policy and error-cost study.
 
-PostgreSQL was initially healthy in Docker, but Docker Desktop failed during a subsequent Airflow image export. **A complete Docker/Airflow execution has not yet passed.** See `docs/completion_checklist.md` for acceptance criteria.
+PostgreSQL was initially healthy in Docker, but Docker Desktop failed during a subsequent Airflow image export. **The full-stack GitHub Actions test passed with synthetic data.** The Kaggle-trained XGBoost model was tested separately in WSL, not in that containerized test. See `docs/completion_checklist.md` for acceptance criteria.
 
 The aggregate values above are recorded in [`results/real-data-benchmark.json`](results/real-data-benchmark.json). The raw dataset and trained release remain outside Git.

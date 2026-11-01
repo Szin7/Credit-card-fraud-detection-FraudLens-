@@ -6,7 +6,7 @@ FraudLens began as a way to explore a question that comes up quickly when learni
 
 The project brings together data validation, a comparison of classification models, batch scoring, and a dashboard for reviewing results. I also built out the supporting pipeline so repeated runs are easier to inspect and do not create duplicate prediction decisions.
 
-> **Project status:** Five classifiers have been evaluated on the real ULB/Kaggle credit-card dataset. The selected XGBoost model has been tested locally with SQLite and Streamlit; full Docker/Airflow acceptance remains outstanding. This is a research and portfolio project, not a live payment-fraud service.
+> **Project status:** Five classifiers have been evaluated on the real ULB/Kaggle credit-card dataset. The selected XGBoost model has been tested locally with SQLite and Streamlit; Docker/Airflow integration passed on a GitHub-hosted runner using synthetic test data. This is a research and portfolio project, not a live payment-fraud service.
 
 ## What it does
 
@@ -76,7 +76,7 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-Complete Docker/Airflow execution is not yet claimed as verified. The images built and both DAGs imported successfully in CI, but those checks do not replace a real end-to-end execution.
+A GitHub-hosted full-stack test completed successfully, covering PostgreSQL, Airflow training and inference, replay safety, and dashboard database connectivity. The test uses synthetic inputs; the real-data model was evaluated separately.
 
 ## Verification
 
@@ -104,4 +104,4 @@ ruff check .
 
 This is a batch project, not a real-time card authorization system. The demo uses fabricated features and has no proof of real-world detection accuracy. The application does not yet provide authenticated dashboard access, automated drift alerts, calibrated risk probabilities, or a distributed model registry. Fallback IDs derived from identical feature rows can combine distinct transactions; real systems should supply stable transaction IDs.
 
-The real-data benchmark and local model verification are documented. A complete Docker/Airflow run is still needed; the [verification checklist](docs/completion_checklist.md) records what has and has not passed.
+The real-data benchmark and local model verification are documented. The Docker/Airflow integration passed on a GitHub-hosted runner; the [verification checklist](docs/completion_checklist.md) records what has and has not passed.
