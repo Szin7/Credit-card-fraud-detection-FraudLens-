@@ -78,6 +78,8 @@ docker compose up --build -d
 
 A GitHub-hosted full-stack test completed successfully, covering PostgreSQL, Airflow training and inference, replay safety, and dashboard database connectivity. The test uses synthetic inputs; the real-data model was evaluated separately.
 
+For the optional Kaggle-trained model deployment, see [running the real model in Docker](docs/real_model_container.md).
+
 ## Verification
 
 The GitHub Actions run on October 13, 2026 passed **56 tests** with **85% recorded line coverage**, PostgreSQL integration checks, linting, Docker image builds, and DAG import checks. Details and remaining tests are in [verification.md](docs/verification.md).

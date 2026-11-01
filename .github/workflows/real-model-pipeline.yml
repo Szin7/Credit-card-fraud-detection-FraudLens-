@@ -1,0 +1,70 @@
+name: Real model pipeline check
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag of the GitHub release holding your trusted model archive"
+        required: true
+        default: "kaggle-model"
+        type: string
+      archive_sha256:
+        description: "SHA-256 of the ZIP file, computed before uploading it"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  real-model-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      STORAGE_MODE: local
+      POSTGRES_USER: fraudlens
+      POSTGRES_PASSWORD: fraudlens
+      POSTGRES_DB: fraudlens
+      AIRFLOW_DB: airflow
+      AIRFLOW_ADMIN_USER: admin
+      AIRFLOW_ADMIN_PASSWORD: ci-test-only
+      INFERENCE_INPUT: /incoming/docker-demo-inference.csv
+      POSTGRES_PORT: "5432"
+      MODEL_ARCHIVE_SHA256: ${{ inputs.archive_sha256 }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare synthetic scoring input
+        run: python3 scripts/prepare_docker_demo.py
+      - name: Fetch owner-supplied Kaggle model release
+        run: |
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern fraudlens-model-release.zip \
+            --dir data/incoming
+          echo "$MODEL_ARCHIVE_SHA256  data/incoming/fraudlens-model-release.zip" | sha256sum --check --status
+      - name: Verify configuration
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.real.yml config --quiet
+      - name: Build containers on GitHub's runner
+        run: docker compose build dashboard airflow-init
+      - name: Start PostgreSQL
+        run: docker compose up -d --wait postgres
+      - name: Initialize Airflow
+        run: docker compose up --exit-code-from airflow-init airflow-init
+      - name: Import and register the Kaggle-trained release
+        run: docker compose -f docker-compose.yml -f docker-compose.real.yml run --rm model-import
+      - name: Start scheduler and dashboard
+        run: docker compose up -d airflow-scheduler airflow-webserver dashboard
+      - name: Verify model, inference, replay and dashboard
+        run: python3 scripts/check_real_model_stack.py --expected-rows 6080
+      - name: Collect service status and logs
+        if: always()
+        run: |
+          docker compose ps -a || true
+          docker compose logs --tail=100 airflow-scheduler dashboard postgres || true
+      - name: Stop services without deleting volumes
+        if: always()
+        run: docker compose down || true
