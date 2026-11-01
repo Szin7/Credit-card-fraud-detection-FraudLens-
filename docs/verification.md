@@ -1,74 +1,37 @@
-# Verification notes
+# Verification and evidence
 
-This page separates evidence that exists from work still on the checklist. It is not a production-readiness certificate.
+This page records what FraudLens has demonstrated, with links to actual GitHub Actions runs. A passed workflow verifies the code and configuration it ran; it is not evidence of a permanent public deployment.
 
-## Checks already recorded
+## Verified checks
 
-| Check | Evidence |
-|---|---|
-| Synthetic end-to-end local demonstration | Completed: labeled training, unlabeled scoring, and replay with zero additional decisions |
-| Four Streamlit pages | AppTest passed and all four pages were opened and reviewed in a local browser |
-| Local source tests | Most recent reported WSL check: 65 passed, 2 skipped; Ruff clean |
-| GitHub Actions on 2026-10-13, commit `7b8e377` | **Passed**: 56 tests, 85% line coverage, linting, PostgreSQL test service, Compose config, and Docker image builds |
-| Airflow image DAG imports | **Passed** in GitHub Actions: both training and inference DAGs imported |
-| Synthetic five-model benchmark | Completed; details in `docs/results/synthetic-benchmark.json` |
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Python tests, linting, container builds and DAG imports | Passed on the current `main` commit `ed60d4a` | [CI run](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41326322968) |
+| Training, inference, PostgreSQL persistence and Streamlit connectivity | Passed with synthetic test data | [Full-stack acceptance](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41317199864) |
+| Saved Kaggle-trained XGBoost release imported into Docker | Passed; model registered and used without retraining | [Real-model pipeline check](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119) |
+| Repeat inference adds no identical decisions | Passed in local and containerized checks | [Real-model pipeline check](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119) |
+| Local real-model dashboard | Four pages opened and reviewed; SQLite demonstration completed | [Real-data model card](real_model_card.md) |
+| Local Python checks | Last reported WSL check: 65 passed, 2 skipped; Ruff clean | [Completion checklist](completion_checklist.md) |
 
-GitHub run: https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/38361858659
+The full-stack and real-model acceptance runs were completed on earlier commits. The current single-commit `main` snapshot contains the same implementation, but the **real-model acceptance workflow has not yet been rerun on `ed60d4a`**. That distinction matters when referring to evidence by commit SHA.
 
-The October 13 run established the initial baseline. A later full Docker/Airflow execution passed on 1 November 2026, as recorded below.
+## Research evaluation versus system testing
 
-## Not yet demonstrated
+The selected XGBoost model was evaluated on **59,888 real-data holdout rows**, including **76 known fraud cases**. It recorded precision 0.8852, recall 0.7105, F1 0.7883, average precision 0.7954 and ROC-AUC 0.9737.
 
-- Responsive layout across mobile screen sizes has not been fully verified.
-- Authentication and drift monitoring for a deployed dashboard.
+The local 3,076-row dashboard demonstration intentionally included every fraud example in a selected holdout subset. It is not an independent estimate of deployment alert volume or model accuracy. The container acceptance used **6,080 synthetic scoring inputs** with the real-trained model; that verifies deployment compatibility and data flow, not real-world detection performance.
 
-## Commands to repeat the checks
+For the source figures and method, see [recorded benchmark results](results/real-data-benchmark.json) and the [real-data model card](real_model_card.md).
+
+## Repeat the checks
+
+In a configured Python 3.12 environment:
 
 ```bash
-pytest -q
 ruff check .
-docker compose config --quiet
-docker compose build dashboard airflow-scheduler
+pytest -q
 ```
 
-To verify against PostgreSQL, provide a disposable database with `CREATE SCHEMA` permission:
+The CI workflow runs tests against PostgreSQL and builds the images. To repeat full integration acceptance, open GitHub Actions and manually run **Full stack check** or **Real model pipeline check** on the current `main` branch. The latter requires the trusted `kaggle-model` release and its archive SHA-256; see the [container guide](real_model_container.md).
 
-```bash
-TEST_DATABASE_URL=postgresql+psycopg2://USER:PASSWORD@localhost/fraudlens_test pytest -q
-```
-
-The CI run is evidence of the tested commit, not proof that future modifications will pass. Rerun the workflow after changes are committed and document the result with its commit SHA.
-
-## Full-stack acceptance — 1 November 2026
-
-Commit: `04542ad` on `fraudlens-work`.
-
-- Tests and container builds passed:
-  https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41313247146
-- Full-stack check passed:
-  https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41313247184
-
-The full-stack run built the containers on GitHub, initialized
-PostgreSQL and Airflow, registered both DAGs, executed training
-and inference, and stored 6,080 synthetic transaction predictions.
-Repeating inference did not add duplicate predictions.
-
-The Streamlit health endpoint and PostgreSQL-backed dashboard
-metadata check passed.
-
-This is a synthetic-data deployment acceptance test. The separate
-Kaggle benchmark is the source of the reported real-data performance.
-Local Docker Desktop recovery and production security hardening are
-not covered by this CI run.
-
-## Kaggle-trained model in Docker — 1 November 2026
-
-Commit: `a005209` on `main`. [Real-model pipeline check #4](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119) passed.
-
-- The runner downloaded the published `kaggle-model` archive and checked its SHA-256.
-- The imported XGBoost release was registered as the real-data model in PostgreSQL.
-- Both Airflow DAGs registered; inference ran using that imported release, without a new training run.
-- Inference stored 6,080 predictions from synthetic integration-test transactions. Repeating the batch added zero duplicate decisions.
-- Streamlit health and PostgreSQL-backed model metadata checks passed.
-
-This demonstrates compatibility of the Kaggle-trained model with the Docker/Airflow application. Fraud-detection precision and recall come from the separate 59,888-row real-data holdout, not the synthetic scoring fixture. GitHub's test runner was temporary and does not host a live application.
+The runners and databases are temporary. Local Docker/Desktop recovery, dashboard authentication, automated drift monitoring and production security review remain outside these acceptance checks.

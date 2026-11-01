@@ -1,69 +1,47 @@
-# Publish the project to GitHub
+# Repository guide
 
-The archive contains the source and Git history. Extract it to a new folder named
-`fraudlens`; do not overwrite your only copy of the original project.
+FraudLens is maintained in this repository: [Szin7 / Credit-card-fraud-detection-FraudLens-](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-).
 
-## 1. Run it locally
+This guide is for navigating, demonstrating and updating the existing project. The [README](../README.md) is the main entry point for new readers.
 
-In WSL2, put it under your Linux home directory when possible, for example
-`~/projects/fraudlens`. Open a terminal there and run the README quick start.
-Run `pytest -q` and `ruff check .` before publishing.
+## Start here
 
-## 2. Create an empty GitHub repository
+| Goal | File or location |
+| --- | --- |
+| Understand the project and run a demo | [README](../README.md) |
+| Review dataset preparation and real-model results | [Real-data experiments](real_data_experiments.md) and [model card](real_model_card.md) |
+| Understand the application design | [Architecture](architecture.md) |
+| Run the application or investigate failures | [Runbook](runbook.md) |
+| Check the Kaggle-trained model inside Docker | [Real-model container guide](real_model_container.md) |
+| Verify that the tested functionality works | [Verification records](verification.md) |
+| Prepare an interview demonstration | [Interview guide](interview_guide.md) |
 
-Sign in to GitHub and create `fraudlens`. Start private while checking the build and
-model claims; make it public when ready for your résumé. Do not initialize it with
-a README, license, or .gitignore because those files/history already exist locally.
-No license is assumed on your behalf.
+## Repository structure
 
-## 3. Connect and push
+The repository separates application code (`src/`), the Streamlit user interface (`dashboard/`), Airflow DAGs (`airflow/dags/`), runnable scripts (`scripts/`), experiments (`notebooks/`), tests (`tests/`) and documentation (`docs/`). Docker and CI configuration live at the repository root and in `.github/workflows/`.
 
-Replace `YOUR_USERNAME` with your actual GitHub username:
+The raw ULB/Kaggle dataset, local SQLite databases and serialized model files are intentionally not committed. The trusted XGBoost archive is distributed separately through the [`kaggle-model` GitHub Release](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/releases/tag/kaggle-model).
 
-```bash
-git status
-git log --oneline -5
-git remote -v
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/fraudlens.git
-git push -u origin main
-```
+## Check a change before merging it
 
-Authenticate through GitHub's browser/credential-manager flow when prompted.
-Do not put a token in the repository URL or commit a token. If `origin` already
-exists, inspect it first and use `git remote set-url origin ...` only if you intend
-to replace that destination. Do not force-push to an existing repository.
-
-## 4. Check Actions
-
-Open the Actions tab. The workflow tests the code with PostgreSQL 16, builds both
-images, and checks DAG imports. A workflow file is not a successful CI run: wait
-for it to pass, and inspect any failure before describing the stack as verified.
-Then run the manual Docker acceptance steps in `docs/runbook.md`.
-
-## 5. Finish the résumé presentation
-
-Add screenshots from your own successful dashboard run, a short demonstration
-recording, and measured real-data results once available. Explain at least one
-failure you reproduced and fixed. Do not present synthetic results as real-world
-fraud performance, or a local deployment as an AWS deployment.
-
-Before making your own commits, configure your name and the verified or privacy-protected
-email address you use on GitHub:
+Use a separate branch for edits and keep unrelated changes out of the same commit. In WSL, from the repository root:
 
 ```bash
-git config user.name "YOUR_NAME"
-git config user.email "YOUR_GITHUB_EMAIL"
+git switch main
+git pull --ff-only origin main
+git switch -c docs-or-fix-description
+
+# Make the changes, then inspect what actually changed.
+git diff --check
+git diff --stat
+ruff check .
+pytest -q
 ```
 
-For subsequent edits:
+Commit only the intended files, push the branch and open a pull request into `main`. Review the diff and wait for CI checks before merging. Check that there are no local datasets, secrets, `.env` files, database files or model binaries in the staged changes.
 
-```bash
-git add <the-files-you-changed>
-git diff --cached
-git commit -m "Describe the behavior changed"
-git push
-```
+For workflow evidence, use the [current CI run](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41326322968), [full-stack acceptance](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41317199864) and [real-model integration test](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119). The latter two were run against earlier project commits; rerun manual workflows on the current branch when fresh acceptance evidence is required.
 
-The supplied history retains original authorship and co-author attribution. There
-is no need to rewrite it to present a technically credible project.
+## Presentation notes
+
+Open the four Streamlit pages and explain the data flow, model-selection decision and the difference between held-out test metrics and synthetic integration-test inputs. Screenshots or a short demo recording should come from an actual successful run. Don't describe a successful GitHub Actions test as a permanently deployed website.

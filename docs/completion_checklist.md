@@ -1,32 +1,32 @@
-# FraudLens: verification and remaining work
+# Project verification checklist
 
-This is an engineering acceptance checklist, not a claim that all checks are complete.
+This checklist distinguishes the completed portfolio demonstration from work that would be required before a live deployment.
 
-## Verified locally on 1 November 2026
+## Research and local demonstration
 
-- [x] Kaggle real dataset: 284,807 rows, 1,081 exact duplicates rejected.
-- [x] Five candidate models trained with a chronological train / validation / test split.
-- [x] Real-data XGBoost test performance checked against the release metadata and confusion matrix.
-- [x] Release exported, checksum validated, imported to WSL, and used for local predictions.
-- [x] Local SQLite real-feature demonstration: 3,076 predictions, 54 flagged, repeat execution inserted zero new predictions.
-- [x] Streamlit Overview, Transaction Explorer, Model Performance, and Pipeline Health were opened and reviewed.
-- [x] Local integration checks: 65 tests passed, 2 skipped; Ruff clean.
-- [x] PostgreSQL container started and reported healthy on host port 5433 before the Docker crash.
+- [x] Validated the ULB/Kaggle dataset and recorded 1,081 rejected exact duplicates.
+- [x] Compared five model candidates using a chronological train/validation/test split.
+- [x] Selected XGBoost and the decision threshold using validation data only.
+- [x] Evaluated the selected model on the 59,888-row held-out test partition.
+- [x] Exported the trusted model release and verified its archive and model checksums.
+- [x] Scored 3,076 fraud-enriched holdout-feature examples into local SQLite; the same batch produced no duplicates on replay.
+- [x] Opened and reviewed the four Streamlit dashboard pages.
 
-## Container verification and remaining work
+## Automated and container verification
 
-- [ ] Recover the Docker Desktop Linux engine after the `SIGBUS` image-export fault and HTTP 500 error.
-- [ ] Keep Docker's disk image off a nearly full C: drive, if another suitably sized drive is available.
-- [x] Final local integration checks passed: 65 tests, 2 skipped, Ruff clean.
-- [x] Full-stack GitHub Actions test passed on `main`: https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41317199864
-- [x] Kaggle-trained XGBoost model imported and used in the Docker/Airflow/PostgreSQL test on `main`: https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119
-- [x] The imported real-trained release scored 6,080 synthetic integration-test rows; replay inserted no duplicate decisions.
-- [x] PostgreSQL schema, Airflow initialization, scheduler and both DAGs verified on GitHub's runner.
-- [x] Containerized replay inserted no duplicate predictions.
-- [x] Containerized Streamlit health and PostgreSQL-backed model metadata checks passed.
-- [ ] Review container resources, vulnerabilities, and environment variables before any public deployment.
-- [x] Portfolio implementation and real-model integration merged into `main` through pull requests #1–#3.
+- [x] Current `main` commit `ed60d4a`: Python tests, linting, Docker builds and DAG import checks passed in [CI](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41326322968).
+- [x] Synthetic full-stack training, inference, replay protection and PostgreSQL/Streamlit checks passed on a [GitHub-hosted runner](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41317199864).
+- [x] Trusted Kaggle-trained model was imported into Docker, registered in PostgreSQL, and used by Airflow for 6,080 synthetic test transactions in the [real-model acceptance run](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119).
+- [x] Replaying that batch inserted zero duplicate decisions; dashboard/database verification passed.
+- [ ] Rerun the manual real-model acceptance workflow on the current single-commit `main` snapshot to obtain a matching latest-commit run record (optional for the unchanged implementation).
+
+## Outside the current portfolio scope
+
+- [ ] Persistent hosted service with authentication and secure secrets management.
+- [ ] Production monitoring, alerting, drift checks, audit retention and operational threshold policies.
+- [ ] Long-term performance validation on genuinely future payment data.
+- [ ] Recovery of the earlier local Docker Desktop Linux-engine issue, if local container demonstration is needed.
 
 ## Reporting rules
 
-The 59,888-row chronological test metrics are the actual real-data evaluation. The 3,076-row deliberately enriched subset only demonstrates scoring and dashboard behavior. Keep the synthetic benchmark separate. Do not commit `.env`, raw Kaggle data, SQLite files, or serialized model releases to Git. The checked model ZIP is distributed separately as a public GitHub Release asset.
+Use the 59,888-row chronological test results for real-data accuracy discussions. The 3,076-row local demonstration and 6,080-row synthetic container acceptance serve different purposes and must not be reported as independent real-world model evaluation. Do not commit `.env`, the raw Kaggle dataset, local SQLite files or serialized models. The checked model archive is a separate [public GitHub Release asset](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/releases/tag/kaggle-model).

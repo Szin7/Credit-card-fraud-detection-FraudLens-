@@ -131,7 +131,7 @@ Both have passed on GitHub-hosted runners:
 
 - [Full-stack Docker/Airflow check — passed](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41317199864)
 - [Real-model Docker/Airflow check — passed](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119)
-- [Tests and container builds — passed](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41321360442)
+- [Tests and container builds — passed](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41326322968)
 
 The real-model check confirmed that the imported XGBoost release scored **6,080 transactions**, repeated inference added **zero duplicate decisions**, and Streamlit could read the stored predictions and real-model metadata. The runners and their databases are temporary; a successful Action is **not** a persistent hosted deployment.
 
