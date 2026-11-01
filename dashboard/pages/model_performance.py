@@ -87,7 +87,10 @@ with col1:
             )
         )
         fig.update_yaxes(autorange="reversed")
-        fig = apply_chart_theme(fig, height=280)
+        fig = apply_chart_theme(fig, height=340)
+        fig.update_layout(margin=dict(l=110, r=20, t=24, b=90))
+        fig.update_xaxes(automargin=True)
+        fig.update_yaxes(automargin=True)
         st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
 
 with col2:

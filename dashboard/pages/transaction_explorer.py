@@ -17,7 +17,7 @@ if "explorer_page" not in st.session_state:
 with st.container(border=True):
     col1, col2, col3 = st.columns([1.4, 1.6, 1.6])
     with col1:
-        risk_filter = st.multiselect("Risk level", ["LOW", "REVIEW", "HIGH"], default=["HIGH", "REVIEW"])
+        risk_filter = st.multiselect("Risk level", ["LOW", "REVIEW", "HIGH"], default=["LOW", "REVIEW", "HIGH"])
         search_id = st.text_input("Transaction ID contains", placeholder="e.g. a1b2c3")
     with col2:
         prob_range = st.slider("Model score", 0.0, 1.0, (0.0, 1.0), step=0.01)

@@ -6,7 +6,7 @@ FraudLens began as a way to explore a question that comes up quickly when learni
 
 The project brings together data validation, a comparison of classification models, batch scoring, and a dashboard for reviewing results. I also built out the supporting pipeline so repeated runs are easier to inspect and do not create duplicate prediction decisions.
 
-> **Project status:** The application and synthetic demo are implemented. A real-dataset benchmark and a full Docker/Airflow end-to-end run are the next validation steps. This is a learning and portfolio project, not a live payment-fraud service.
+> **Project status:** Five classifiers have been evaluated on the real ULB/Kaggle credit-card dataset. The selected XGBoost model has been tested locally with SQLite and Streamlit; full Docker/Airflow acceptance remains outstanding. This is a research and portfolio project, not a live payment-fraud service.
 
 ## What it does
 
@@ -64,7 +64,7 @@ The reference dataset used for planned experiments is [Credit Card Fraud Detecti
 
 For a real-data experiment, use the [experiment guide](docs/real_data_experiments.md) and `scripts/benchmark_real_data.py`. A checked model export can be imported with `scripts/import_model_release.py`. The runner uses the existing validation, training, and model-selection code without requiring PostgreSQL or Airflow. A chronological split is the default; the test set is reserved until after model and threshold selection.
 
-The currently recorded [model card](docs/model_card.md) and [synthetic benchmark](docs/results/synthetic-benchmark.json) describe **synthetic data only**. Results from real transactions will be added only after running and verifying the experiment.
+The [synthetic model card](docs/model_card.md) and [synthetic benchmark](docs/results/synthetic-benchmark.json) remain separate from the [real-data model card](docs/real_model_card.md) and [measured results](docs/results/real-data-benchmark.json).
 
 ## Full pipeline with Docker
 
@@ -104,4 +104,4 @@ ruff check .
 
 This is a batch project, not a real-time card authorization system. The demo uses fabricated features and has no proof of real-world detection accuracy. The application does not yet provide authenticated dashboard access, automated drift alerts, calibrated risk probabilities, or a distributed model registry. Fallback IDs derived from identical feature rows can combine distinct transactions; real systems should supply stable transaction IDs.
 
-Planned experiments include a real-data Kaggle benchmark and local model verification. A complete Docker/Airflow run is also still needed. The results and limitations will be documented alongside the code.
+The real-data benchmark and local model verification are documented. A complete Docker/Airflow run is still needed; the [verification checklist](docs/completion_checklist.md) records what has and has not passed.

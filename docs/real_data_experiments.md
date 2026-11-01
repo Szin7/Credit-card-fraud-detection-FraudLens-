@@ -58,20 +58,25 @@ python -m scripts.import_model_release --archive /path/to/fraudlens-real-model-r
 
 This verifies the archive structure, model checksum and feature schema. It does **not** deserialize the model, register its metrics in the database, or make it active by default. Once you trust the artifact and have matched environment versions, `--publish` updates the local model pointer. Database registration and dashboard acceptance remain separate checks.
 
-## Results table
+## Recorded experiment results (1 November 2026)
 
-Fill this from the recorded output, not from expectations or the synthetic demo.
+The experiment completed on Kaggle CPU using Python 3.12.15. From 284,807 source transactions, validation removed 1,081 duplicate rows. The chronological test partition contained 59,888 transactions, including 76 fraud cases. Results below are from the **full held-out test partition**.
 
-| Metric | Real-data result |
-|---|---|
-| Model selected | Not run yet |
-| Chronological validation average precision | Not run yet |
-| Test average precision | Not run yet |
-| Test precision | Not run yet |
-| Test recall | Not run yet |
-| Test F1 | Not run yet |
-| Test true positives / false negatives | Not run yet |
-| Test false positives / true negatives | Not run yet |
+| Measure | Verified value |
+|---|---:|
+| Selected model | XGBoost |
+| Validation average precision | 0.7677 |
+| Selected threshold | 0.95 |
+| Test average precision | 0.7954 |
+| Test precision | 0.8852 |
+| Test recall | 0.7105 |
+| Test F1 | 0.7883 |
+| True positives / false negatives | 54 / 22 |
+| False positives / true negatives | 7 / 59,805 |
+
+The trained model was exported, checksum-verified, imported into WSL and used successfully in a local batch/SQLite/Streamlit check. A deliberately enriched dashboard sample contained 3,076 holdout-feature rows and led to 54 flags; it is **not an independent performance evaluation**.
+
+See [`real_model_card.md`](real_model_card.md) for interpretation and [`results/real-data-benchmark.json`](results/real-data-benchmark.json) for recorded values. The Docker/Airflow end-to-end test remains open.
 
 ## Discussion prompts
 

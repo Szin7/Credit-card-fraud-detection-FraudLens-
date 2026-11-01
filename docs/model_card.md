@@ -39,4 +39,4 @@ Scores are not calibrated fraud probabilities. Low/review/high risk categories a
 
 ## What remains
 
-Run a separate chronological benchmark on the real reference dataset, compare false positives and false negatives, and record full reproducibility metadata. The results above must never be presented as real-data performance. See `docs/real_data_experiments.md` for the experiment plan.
+A separate chronological real-data benchmark has now been run; its measurements and limitations are in [`real_model_card.md`](real_model_card.md). The synthetic metrics on this page must never be presented as real-data performance.
