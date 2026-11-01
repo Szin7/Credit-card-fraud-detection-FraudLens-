@@ -59,7 +59,7 @@ jobs:
       - name: Start scheduler and dashboard
         run: docker compose up -d airflow-scheduler airflow-webserver dashboard
       - name: Verify model, inference, replay and dashboard
-        run: python3 scripts/check_real_model_stack.py --expected-rows 6080
+        run: python3 -m scripts.check_real_model_stack --expected-rows 6080
       - name: Collect service status and logs
         if: always()
         run: |
