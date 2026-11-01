@@ -1,0 +1,2 @@
+# The Airflow environment uses the dependencies in the pinned base image.
+# The application runs in /opt/fraudlens-venv using root requirements.txt.
