@@ -11,7 +11,7 @@ from dashboard.components.widgets import kpi_row, render_empty_state, render_err
 from src.database import repository as repo
 
 st.title("Overview")
-st.caption("Live snapshot of transaction risk across the current prediction set.")
+st.caption("Stored transaction predictions from the current database.")
 
 
 @st.cache_data(ttl=60)
@@ -59,8 +59,8 @@ with st.container(border=True):
         unsafe_allow_html=True,
     )
 
-    if trend.empty:
-        st.write("Not enough data to chart a trend yet.")
+    if len(trend) < 2:
+        st.info("A time trend needs transactions spanning at least two hourly buckets. This sample covers only one.")
     else:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         fig.add_trace(
@@ -86,7 +86,32 @@ with st.container(border=True):
             secondary_y=True,
         )
         fig.update_yaxes(title_text="Predictions", secondary_y=False)
-        fig.update_yaxes(title_text="Avg. model score", secondary_y=True, range=[0, 1])
+        score_max = float(trend["avg_probability"].max())
+        score_axis_max = min(1.0, max(0.01, score_max * 1.3))
+
+        fig.update_yaxes(
+            title_text="Avg. model score",
+            secondary_y=True,
+            range=[0, score_axis_max],
+            tickformat=".3f",
+            nticks=6,
+        )
+        fig.update_yaxes(
+            title_text="Predictions",
+            secondary_y=False,
+            tickformat=",d",
+            rangemode="tozero",
+            nticks=6,
+            automargin=True,
+        )
+        fig.update_xaxes(
+            dtick=1,
+            automargin=True,
+            title_standoff=16,
+        )
+        fig.update_layout(
+            margin=dict(l=70, r=75, t=55, b=75)
+        )
         fig.update_xaxes(title_text="Hour since first transaction")
         fig = apply_chart_theme(fig, height=360)
         st.plotly_chart(fig, width="stretch", theme=None, config={"displayModeBar": False})
@@ -118,8 +143,8 @@ with col1:
 with col2:
     with st.container(border=True):
         st.subheader("Transaction Volume")
-        if trend.empty:
-            st.write("Not enough data to chart volume yet.")
+        if len(trend) < 2:
+            st.metric("Stored predictions", int(trend["transaction_count"].sum()))
         else:
             fig = go.Figure(
                 go.Scatter(

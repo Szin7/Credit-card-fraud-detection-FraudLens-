@@ -1,4 +1,5 @@
 x-airflow-common: &airflow-common
+  image: fraudlens-airflow:local
   build:
     context: .
     dockerfile: airflow/Dockerfile
@@ -58,7 +59,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:8501:8501"
+      - "127.0.0.1:${DASHBOARD_PORT:-8501}:8501"
     environment:
       STORAGE_MODE: ${STORAGE_MODE:-local}
       POSTGRES_HOST: postgres

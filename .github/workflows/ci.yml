@@ -1,7 +1,7 @@
 name: Tests and container builds
 on:
   push:
-    branches: [main]
+    branches: [main, fraudlens-work]
   pull_request:
   workflow_dispatch:
 permissions:

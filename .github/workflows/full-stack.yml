@@ -1,0 +1,50 @@
+name: Full stack check
+
+on:
+  push:
+    branches: [fraudlens-work]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      STORAGE_MODE: local
+      POSTGRES_USER: fraudlens
+      POSTGRES_PASSWORD: fraudlens
+      POSTGRES_DB: fraudlens
+      AIRFLOW_DB: airflow
+      AIRFLOW_ADMIN_USER: admin
+      AIRFLOW_ADMIN_PASSWORD: local-smoke-test-only
+      DATASET_KIND: synthetic
+      TRAINING_SPLIT: stratified
+      TRAINING_INPUT: /incoming/docker-demo-train.csv
+      INFERENCE_INPUT: /incoming/docker-demo-inference.csv
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare synthetic input files
+        run: python3 scripts/prepare_docker_demo.py
+      - name: Check Docker Compose
+        run: docker compose config --quiet
+      - name: Build containers on GitHub's runner
+        run: docker compose build dashboard airflow-init
+      - name: Start database
+        run: docker compose up -d --wait postgres
+      - name: Initialize Airflow
+        run: docker compose up --exit-code-from airflow-init airflow-init
+      - name: Start Airflow and dashboard
+        run: docker compose up -d airflow-webserver airflow-scheduler dashboard
+      - name: Verify DAGs, persistence, retries and dashboard
+        run: python3 scripts/check_full_stack.py
+      - name: Record container status and selected logs
+        if: always()
+        run: |
+          docker compose ps -a || true
+          docker compose logs --tail=120 airflow-scheduler airflow-webserver postgres dashboard || true
+      - name: Stop the stack without deleting volumes
+        if: always()
+        run: docker compose down || true

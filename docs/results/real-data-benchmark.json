@@ -1,0 +1,64 @@
+{
+  "dataset": "Kaggle/ULB creditcardfraud (creditcard.csv)",
+  "source_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+  "experiment_date_utc": "2026-11-01",
+  "dataset_kind": "real",
+  "split_strategy": "chronological",
+  "source_rows": 284807,
+  "exact_duplicates_rejected": 1081,
+  "validated_rows": 283726,
+  "validated_fraud": 473,
+  "train_rows": 173176,
+  "train_fraud": 343,
+  "validation_rows": 50662,
+  "validation_fraud": 54,
+  "test_rows": 59888,
+  "test_fraud": 76,
+  "validation_average_precision_by_model": {
+    "dummy_baseline": 0.0010658876475464845,
+    "logistic_regression_class_weight": 0.7443815266170969,
+    "logistic_regression_smote": 0.7557086330405488,
+    "random_forest": 0.7454999882864517,
+    "xgboost": 0.7676657928034148
+  },
+  "champion": "xgboost",
+  "selection_policy": "highest validation average precision; threshold selected using validation F1",
+  "selected_threshold": 0.95,
+  "test_metrics": {
+    "precision": 0.8852459016393442,
+    "recall": 0.7105263157894737,
+    "f1": 0.7883211678832117,
+    "pr_auc": 0.7953524581279056,
+    "roc_auc": 0.9737059892927664,
+    "true_positives": 54,
+    "false_positives": 7,
+    "true_negatives": 59805,
+    "false_negatives": 22
+  },
+  "release_id": "5b2199ca89074675942cc6e269a10387",
+  "local_inference_demonstration": {
+    "note": "Deliberately enriched holdout subset. Its alert rate is not a population estimate or a second independent evaluation.",
+    "rows": 3076,
+    "fraud_cases_in_source_selection": 76,
+    "legitimate_cases_in_source_selection": 3000,
+    "predictions_inserted": 3076,
+    "flagged": 54,
+    "high_risk": 57,
+    "repeat_run_new_predictions": 0,
+    "database": "SQLite"
+  },
+  "runtime": {
+    "python": "3.12.15",
+    "pandas": "3.0.5",
+    "scikit_learn": "1.9.1",
+    "xgboost": "3.4.1",
+    "imbalanced_learn": "0.14.2"
+  },
+  "limitations": [
+    "No cardholder or merchant identifier for entity-disjoint validation",
+    "Short historical period does not establish long-term robustness",
+    "Scores are not established as calibrated fraud probabilities",
+    "Small number of fraud examples in chronological holdout",
+    "Duplicate removal may merge distinct events with identical recorded features"
+  ]
+}
