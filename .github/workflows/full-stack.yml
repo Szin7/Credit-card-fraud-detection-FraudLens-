@@ -1,6 +1,8 @@
 name: Full stack check
 
 on:
+  push:
+    branches: [fraudlens-work]
   workflow_dispatch:
 
 permissions:
