@@ -15,14 +15,11 @@ This page separates evidence that exists from work still on the checklist. It is
 
 GitHub run: https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/38361858659
 
-The October 13 GitHub Actions run completed successfully. The full Docker/Airflow execution remains a separate acceptance check.
+The October 13 run established the initial baseline. A later full Docker/Airflow execution passed on 1 November 2026, as recorded below.
 
 ## Not yet demonstrated
 
-- A complete Docker Compose startup including actual Airflow training and inference execution against PostgreSQL, followed by a replay.
-- Local acceptance of dashboard appearance and interactions in a browser, including responsive layout.
-- Real-data chronological benchmark on the reference Kaggle dataset.
-- Transfer and verification of a Kaggle-trained release in the local application and database.
+- Responsive layout across mobile screen sizes has not been fully verified.
 - Authentication and drift monitoring for a deployed dashboard.
 
 ## Commands to repeat the checks

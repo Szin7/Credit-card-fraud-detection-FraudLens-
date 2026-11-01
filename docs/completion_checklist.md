@@ -17,11 +17,11 @@ This is an engineering acceptance checklist, not a claim that all checks are com
 
 - [ ] Recover the Docker Desktop Linux engine after the `SIGBUS` image-export fault and HTTP 500 error.
 - [ ] Keep Docker's disk image off a nearly full C: drive, if another suitably sized drive is available.
-- [ ] Run `ruff check .` and `pytest -q` after all documentation and script changes.
-- [ ] Run the optional full-stack GitHub Actions workflow and retain the successful run URL / logs.
-- [ ] Confirm PostgreSQL schema, Airflow initialization, scheduler, and both DAGs.
-- [ ] Confirm repeated containerized inference stores no duplicate decisions.
-- [ ] Confirm containerized Streamlit reads data and model metrics from PostgreSQL.
+- [x] Local checks passed: 61 tests, 2 skipped, Ruff clean.
+- [x] Full-stack GitHub Actions test passed: https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41313247184
+- [x] PostgreSQL schema, Airflow initialization, scheduler and both DAGs verified on GitHub's runner.
+- [x] Containerized replay inserted no duplicate predictions.
+- [x] Containerized Streamlit health and PostgreSQL-backed model metadata checks passed.
 - [ ] Review container resources, vulnerabilities, and environment variables before any public deployment.
 - [ ] Commit/push verified changes on `fraudlens-work`; review and merge into `main` when appropriate.
 
