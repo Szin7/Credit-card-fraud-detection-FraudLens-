@@ -49,9 +49,45 @@ def wait_stage(kind: str, minimum: int, timeout: int = 900) -> None:
     raise TimeoutError(f"Timed out waiting for {kind}; inspect Airflow task logs")
 
 
+
+def wait_for_dags(timeout: int = 360) -> None:
+    """Wait until Airflow registers both DAGs in its metadata database."""
+    sql = (
+        "SELECT count(*) FROM dag WHERE is_active = true "
+        "AND dag_id IN ("
+        "'fraud_training_pipeline', 'fraud_inference_pipeline')"
+    )
+    shell = (
+        'psql -U "$POSTGRES_USER" -d "$AIRFLOW_DB" -At -c '
+        + shlex.quote(sql)
+    )
+
+    deadline = time.monotonic() + timeout
+    last_error = None
+
+    while time.monotonic() < deadline:
+        try:
+            output = run(
+                "docker", "compose", "exec", "-T",
+                "postgres", "sh", "-c", shell
+            )
+            if int(output.splitlines()[-1]) == 2:
+                print("Both Airflow DAGs registered.", flush=True)
+                return
+        except (RuntimeError, ValueError) as exc:
+            last_error = str(exc)
+
+        time.sleep(5)
+
+    raise TimeoutError(
+        f"Airflow DAG registration timed out. Last error: {last_error}"
+    )
+
+
 def main() -> None:
     assert count("SELECT count(*) FROM information_schema.tables WHERE table_name='pipeline_runs'") >= 1
     print("PostgreSQL application schema found", flush=True)
+    wait_for_dags()
 
     # Keep scheduled inference paused until the training release exists.
     print(run("docker", "compose", "exec", "-T", "airflow-scheduler", "airflow", "dags", "unpause", "fraud_training_pipeline"))
