@@ -1,43 +1,95 @@
 # FraudLens
 
-**Credit-card fraud detection and transaction risk analysis**
+**Credit-card fraud detection, from model evaluation to a working batch pipeline.**
 
-FraudLens began as a way to explore a question that comes up quickly when learning machine learning: how do you find a rare event without producing too many false alarms? Credit-card fraud is a useful case because fraudulent transactions make up a very small share of the data.
+FraudLens started with a fairly simple question: when fraud is rare, how do you catch more of it without burying legitimate transactions in false alarms?
 
-The project brings together data validation, a comparison of classification models, batch scoring, and a dashboard for reviewing results. I also built out the supporting pipeline so repeated runs are easier to inspect and do not create duplicate prediction decisions.
+I used the anonymized ULB credit-card dataset to compare a handful of classifiers, then built the rest of the application around the selected model: CSV validation, versioned predictions, a database, an Airflow pipeline, and a Streamlit dashboard. The same XGBoost release trained during the Kaggle experiment has also been tested inside the containerized pipeline.
 
-> **Project status:** Five classifiers have been evaluated on the real ULB/Kaggle credit-card dataset. The selected XGBoost model has been tested locally with SQLite and Streamlit; Docker/Airflow integration passed on a GitHub-hosted runner using synthetic test data. This is a research and portfolio project, not a live payment-fraud service.
+This is a research and engineering project, **not a live card-payment service**. The dashboard runs locally, and the Docker integration is verified by GitHub Actions rather than hosted as a permanent public application.
 
-## What it does
+## What you can do with it
 
-- Reads transaction CSV files and separates invalid records, keeping an explanation of why each row was rejected.
-- Trains and compares a dummy baseline, weighted Logistic Regression, Logistic Regression with SMOTE, Random Forest, and XGBoost.
-- Chooses a model using validation average precision, then selects its classification threshold using validation F1.
-- Scores new batches without requiring a known `Class` label.
-- Stores transactions and versioned predictions in SQLite (local demo) or PostgreSQL.
-- Provides four Streamlit pages: Overview, Transaction Explorer, Model Performance, and Pipeline Health.
-- Includes scheduled batch inference with Airflow, Docker setup, and automated tests.
+- Validate incoming CSVs and keep rejected rows with reasons for rejection.
+- Train and compare five classifiers, including class weighting and SMOTE-based training.
+- Score batches that have no fraud label (`Class`) yet.
+- Track transactions, model versions, predictions, and pipeline runs in SQLite or PostgreSQL.
+- Review alerts, model evaluation, and run history through four Streamlit pages.
+- Run training and inference as separate Airflow DAGs in Docker.
+- Rerun an inference batch without inserting the same prediction decision twice.
 
-## How the pieces fit together
+## Real-data results
+
+I used the [ULB credit-card fraud dataset on Kaggle](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud): 284,807 original transactions, of which 492 were labeled as fraud. After rejecting 1,081 exact duplicate rows, 283,726 records remained.
+
+The split was chronological by the dataset's elapsed `Time` field, with matching timestamps kept in the same partition. I chose the model using **validation average precision** and chose its decision threshold using **validation F1**. Only then did I evaluate the selected model on the held-out test partition.
+
+| Partition | Transactions | Fraud cases |
+| --- | ---: | ---: |
+| Training | 173,176 | 343 |
+| Validation | 50,662 | 54 |
+| Test | 59,888 | 76 |
+
+### Model comparison
+
+| Model | Validation average precision |
+| --- | ---: |
+| Dummy baseline | 0.0011 |
+| Logistic Regression (class-weighted) | 0.7444 |
+| Logistic Regression + SMOTE | 0.7557 |
+| Random Forest | 0.7455 |
+| **XGBoost** | **0.7677** |
+
+XGBoost was selected with a decision threshold of **0.95**. On the held-out chronological test set:
+
+| Metric | Result |
+| --- | ---: |
+| Precision | **88.52%** |
+| Recall | **71.05%** |
+| F1-score | **78.83%** |
+| Average precision | **0.7954** |
+| ROC-AUC | **0.9737** |
+| True positives / false positives | **54 / 7** |
+| False negatives / true negatives | **22 / 59,805** |
+
+In practical terms, the model caught **54 of the 76 fraud cases** in the test set and missed 22. Seven legitimate transactions were flagged incorrectly. That trade-off matters more here than overall accuracy, since the dataset is overwhelmingly legitimate transactions.
+
+The measurements and experiment details are in the [real-data model card](docs/real_model_card.md) and [recorded benchmark](docs/results/real-data-benchmark.json). The [Kaggle notebook](notebooks/02_real_data_benchmark.ipynb) and [experiment guide](docs/real_data_experiments.md) describe how the run was carried out.
+
+## How the system fits together
 
 ```mermaid
 flowchart TD
-    A[Transaction CSV] --> B[Read and validate]
-    B --> C[Rejected rows + reasons]
-    B --> D[Valid records]
-    D --> E[Train and compare models]
-    E --> F[Save model release]
-    D --> G[Batch scoring]
-    F --> G
-    G --> H[Save versioned predictions]
-    H --> I[Streamlit dashboard]
+    A[ULB / Kaggle labeled data] --> B[Validate and split by Time]
+    B --> C[Train and compare five models]
+    C --> D[Select XGBoost and threshold]
+    D --> E[Versioned model release]
+    F[Incoming transaction CSV] --> G[Ingest and validate batch]
+    E --> H[Inference pipeline]
+    G --> H
+    H --> I[Versioned predictions]
+    I --> J[(SQLite locally / PostgreSQL in Docker)]
+    J --> K[Streamlit dashboard]
 ```
 
-Training and scoring are separate workflows. A fitted preprocessing pipeline is saved with each model so the same transformations run during inference. SMOTE is used only on training data. The database also prevents a rerun from inserting the same decision twice for a given transaction, model version, and threshold.
+**Training and inference are deliberately separate.** The deployed model is saved as an immutable release with metadata and a checksum. Inference loads that release, applies its saved preprocessing, and uses the threshold stored with the model rather than silently substituting a new one.
 
-## Run the local demo
+The database stores one prediction per transaction, model version, and threshold. This makes an identical rerun replay-safe. The dashboard's LOW / REVIEW / HIGH risk bands are display categories; they are not the same thing as the model's fraud decision threshold.
 
-The easiest way to explore the application is with Python 3.12. No Docker or AWS account is required.
+### Dashboard
+
+| Page | What it shows |
+| --- | --- |
+| **Overview** | Scored transactions, flagged counts, risk distribution, and trends |
+| **Transaction Explorer** | Searchable predictions, scores, and transaction details |
+| **Model Performance** | Precision/recall, confusion matrix, comparisons, curves, and threshold analysis |
+| **Pipeline Health** | Ingestion, validation, training, and inference run history |
+
+## Run it locally
+
+The quickest way to explore the dashboard uses the included **synthetic demonstration data**. You don't need AWS or Docker for this path.
+
+Use Python 3.12:
 
 ```bash
 python3.12 -m venv .venv
@@ -46,64 +98,72 @@ python -m pip install -r requirements-dev.txt
 python -m scripts.demo --dashboard
 ```
 
-For Windows PowerShell, activate with `.venv\\Scripts\\Activate.ps1`. If needed, use `py -3.12` to create the environment.
+Open [http://localhost:8501](http://localhost:8501). The command creates a local SQLite demo database, trains candidates on the synthetic fixture, scores an unlabeled copy, and checks that a repeat run adds no new decisions. **The synthetic scores are not evidence of real-data fraud-detection accuracy.**
 
-Open **http://localhost:8501**. The demo creates synthetic labeled data, trains the model candidates, scores an unlabeled copy, and verifies that scoring the same batch again adds no duplicate predictions. Its dashboard counts are **not** an independent estimate of model accuracy.
-
-After the initial run:
+For subsequent runs with that synthetic demo, use:
 
 ```bash
 python -m scripts.demo --skip-training --dashboard
 ```
 
-## The data and experiments
+### Open an existing real-model dashboard
 
-The checked-in sample was generated for demonstration. It is **not** the real credit-card dataset, and the high synthetic benchmark scores should not be read as real-world performance.
+The real-trained XGBoost release was also tested locally using an intentionally fraud-enriched set of **3,076 real-feature holdout rows**. That run stored 3,076 predictions in SQLite, flagged 54, and added no predictions on replay. This subset was prepared for the interface demonstration, **not** used as another independent accuracy test.
 
-The reference dataset used for planned experiments is [Credit Card Fraud Detection on Kaggle](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud). It uses `Time`, `Amount`, `V1`-`V28`, and the binary target `Class`. The `V` columns are anonymous components; their real-world meanings are not available.
-
-For a real-data experiment, use the [experiment guide](docs/real_data_experiments.md) and `scripts/benchmark_real_data.py`. A checked model export can be imported with `scripts/import_model_release.py`. The runner uses the existing validation, training, and model-selection code without requiring PostgreSQL or Airflow. A chronological split is the default; the test set is reserved until after model and threshold selection.
-
-The [synthetic model card](docs/model_card.md) and [synthetic benchmark](docs/results/synthetic-benchmark.json) remain separate from the [real-data model card](docs/real_model_card.md) and [measured results](docs/results/real-data-benchmark.json).
-
-## Full pipeline with Docker
-
-For the PostgreSQL and Airflow version, see [the runbook](docs/runbook.md). The configuration uses local ports `8080` for Airflow and `8501` for Streamlit. Training is triggered manually; batch inference has a daily DAG.
+If you've retained that local database, you can open its dashboard without retraining:
 
 ```bash
-cp .env.example .env
-# Review credentials and set DATASET_KIND=synthetic for the bundled demonstration.
-docker compose up --build -d
+test -f .local/fraudlens-real-demo.db
+DATABASE_URL="sqlite:///$PWD/.local/fraudlens-real-demo.db" \
+  python -m streamlit run dashboard/app.py
 ```
 
-A GitHub-hosted full-stack test completed successfully, covering PostgreSQL, Airflow training and inference, replay safety, and dashboard database connectivity. The test uses synthetic inputs; the real-data model was evaluated separately.
+The SQLite file and source transaction data are intentionally not committed. The command above requires a database already created by the real-model demo; it does not download or recreate it.
 
-For the optional Kaggle-trained model deployment, see [running the real model in Docker](docs/real_model_container.md).
+## Docker, Airflow and the real model
 
-## Verification
+The containerized stack has PostgreSQL, an Airflow scheduler/webserver, and Streamlit. It supports two different checks:
 
-The GitHub Actions run on October 13, 2026 passed **56 tests** with **85% recorded line coverage**, PostgreSQL integration checks, linting, Docker image builds, and DAG import checks. Details and remaining tests are in [verification.md](docs/verification.md).
+1. **Synthetic full-stack check:** train and score synthetic data, verify DAG execution, database persistence, replay safety, and dashboard connectivity.
+2. **Real-model pipeline check:** download the [published Kaggle-trained XGBoost release](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/releases/tag/kaggle-model), verify its SHA-256, import and register it in Docker/PostgreSQL, then score 6,080 **synthetic integration-test transactions** through Airflow. It does **not** retrain the Kaggle model.
+
+Both have passed on GitHub-hosted runners:
+
+- [Full-stack Docker/Airflow check — passed](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41317199864)
+- [Real-model Docker/Airflow check — passed](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119)
+- [Tests and container builds — passed](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41321360442)
+
+The real-model check confirmed that the imported XGBoost release scored **6,080 transactions**, repeated inference added **zero duplicate decisions**, and Streamlit could read the stored predictions and real-model metadata. The runners and their databases are temporary; a successful Action is **not** a persistent hosted deployment.
+
+For setup and recovery instructions, see the [Docker runbook](docs/runbook.md) and [real-model container guide](docs/real_model_container.md). Don't use `docker compose down -v` as a routine cleanup step: it removes named-volume data.
+
+## Tests
 
 ```bash
-pytest -q
 ruff check .
+pytest -q
 ```
 
-## Project files
+The final local integration changes passed **65 tests** with **2 skipped**; GitHub Actions also ran the tests with PostgreSQL and checked Docker image builds and Airflow DAG imports. The workflow runs above are the evidence for the container acceptance checks.
 
-| Location | Purpose |
-|---|---|
-| `src/ingestion`, `src/validation` | File snapshots and input checks |
-| `src/features`, `src/models` | Feature processing, model training, scoring, and releases |
-| `src/database`, `sql` | Database access, schema, and migrations |
-| `dashboard` | Streamlit pages and chart components |
-| `scripts` | Local demo, benchmark, and pipeline commands |
-| `airflow/dags` | Training and inference workflows |
-| `tests` | Regression and integration checks |
-| `docs` | Data definitions, model results, architecture, and operations |
+## Repository map
 
-## Limits and further work
+| Path | Purpose |
+| --- | --- |
+| `src/ingestion/`, `src/validation/` | Input snapshots, schema checks, rejected rows |
+| `src/processing/`, `src/models/` | Model features, training, releases, inference |
+| `src/database/`, `sql/` | Persistence, schema, and migrations |
+| `dashboard/` | Streamlit app and four dashboard pages |
+| `airflow/dags/` | Training and inference DAGs |
+| `scripts/` | CLI pipelines, benchmark, import tools, acceptance checks |
+| `notebooks/` | Data exploration and real-data benchmark |
+| `tests/` | Unit and integration tests |
+| `docs/` | Architecture, model cards, experiment notes, and runbooks |
 
-This is a batch project, not a real-time card authorization system. The demo uses fabricated features and has no proof of real-world detection accuracy. The application does not yet provide authenticated dashboard access, automated drift alerts, calibrated risk probabilities, or a distributed model registry. Fallback IDs derived from identical feature rows can combine distinct transactions; real systems should supply stable transaction IDs.
+## What this project does not claim
 
-The real-data benchmark and local model verification are documented. The Docker/Airflow integration passed on a GitHub-hosted runner; the [verification checklist](docs/completion_checklist.md) records what has and has not passed.
+FraudLens is a **batch-processing research application**, not a real-time fraud authorization system. The original dataset covers a short historical period and does not include cardholder or merchant IDs for group-based evaluation. We haven't established long-term drift resilience, calibrated probabilities, production monitoring, or an operationally approved decision threshold.
+
+The serialized model is shared separately as a GitHub Release asset; the raw Kaggle CSV and local SQLite databases are not in the repository. Only load the joblib model if you trust its source—checking a file hash confirms consistency, not safety.
+
+For an actual deployment, I would next address dashboard authentication, secrets, alerting, audit requirements, data retention, and model monitoring. Those are outside the current portfolio scope.

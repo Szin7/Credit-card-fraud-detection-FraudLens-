@@ -7,8 +7,8 @@ This page separates evidence that exists from work still on the checklist. It is
 | Check | Evidence |
 |---|---|
 | Synthetic end-to-end local demonstration | Completed: labeled training, unlabeled scoring, and replay with zero additional decisions |
-| Four Streamlit pages | Passed AppTest execution without application exceptions; no browser visual acceptance recorded |
-| Local source tests | Previous local report: 54 passed, two PostgreSQL tests skipped without a server |
+| Four Streamlit pages | AppTest passed and all four pages were opened and reviewed in a local browser |
+| Local source tests | Most recent reported WSL check: 65 passed, 2 skipped; Ruff clean |
 | GitHub Actions on 2026-10-13, commit `7b8e377` | **Passed**: 56 tests, 85% line coverage, linting, PostgreSQL test service, Compose config, and Docker image builds |
 | Airflow image DAG imports | **Passed** in GitHub Actions: both training and inference DAGs imported |
 | Synthetic five-model benchmark | Completed; details in `docs/results/synthetic-benchmark.json` |
@@ -60,3 +60,15 @@ This is a synthetic-data deployment acceptance test. The separate
 Kaggle benchmark is the source of the reported real-data performance.
 Local Docker Desktop recovery and production security hardening are
 not covered by this CI run.
+
+## Kaggle-trained model in Docker — 1 November 2026
+
+Commit: `a005209` on `main`. [Real-model pipeline check #4](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119) passed.
+
+- The runner downloaded the published `kaggle-model` archive and checked its SHA-256.
+- The imported XGBoost release was registered as the real-data model in PostgreSQL.
+- Both Airflow DAGs registered; inference ran using that imported release, without a new training run.
+- Inference stored 6,080 predictions from synthetic integration-test transactions. Repeating the batch added zero duplicate decisions.
+- Streamlit health and PostgreSQL-backed model metadata checks passed.
+
+This demonstrates compatibility of the Kaggle-trained model with the Docker/Airflow application. Fraud-detection precision and recall come from the separate 59,888-row real-data holdout, not the synthetic scoring fixture. GitHub's test runner was temporary and does not host a live application.

@@ -56,10 +56,10 @@ The saved model release was downloaded from Kaggle and checked before loading in
 
 The deliberately enriched 3,076-row sample is for demonstrating the batch dashboard, **not** for another independent test or an estimate of the natural fraud or alert rate. The real evaluation is the complete 59,888-row test partition above.
 
-## Limits and next checks
+## Limits and deployment status
 
 This is a research and portfolio demonstration, not a live payment-authorization service. The dataset spans a short period and contains no cardholder, merchant, or device identifiers for group-based evaluation. We have not measured long-term drift, deployment performance, or probability calibration. At 0.95, false negatives may matter substantially; a real operational threshold would require an explicit review policy and error-cost study.
 
-PostgreSQL was initially healthy in Docker, but Docker Desktop failed during a subsequent Airflow image export. **The full-stack GitHub Actions test passed with synthetic data.** The Kaggle-trained XGBoost model was tested separately in WSL, not in that containerized test. See `docs/completion_checklist.md` for acceptance criteria.
+The saved Kaggle-trained XGBoost release was later imported into the Docker/PostgreSQL stack in a [GitHub Actions acceptance run](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119). Airflow used that release to score 6,080 synthetic integration-test transactions without retraining. A replay inserted no duplicate decisions, and Streamlit read the registered model metrics from PostgreSQL. This demonstrates that the real-trained model runs in the containerized pipeline; the fraud-detection performance figures above still come from the separate real-data test. The GitHub runner was temporary, not a persistent public deployment.
 
-The aggregate values above are recorded in [`results/real-data-benchmark.json`](results/real-data-benchmark.json). The raw dataset and trained release remain outside Git.
+The aggregate values above are recorded in [`results/real-data-benchmark.json`](results/real-data-benchmark.json). The raw dataset and serialized model are not committed to Git. The checked model archive is available separately as a [public GitHub Release](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/releases/tag/kaggle-model).

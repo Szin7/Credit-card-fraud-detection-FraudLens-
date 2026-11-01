@@ -76,7 +76,7 @@ The experiment completed on Kaggle CPU using Python 3.12.15. From 284,807 source
 
 The trained model was exported, checksum-verified, imported into WSL and used successfully in a local batch/SQLite/Streamlit check. A deliberately enriched dashboard sample contained 3,076 holdout-feature rows and led to 54 flags; it is **not an independent performance evaluation**.
 
-See [`real_model_card.md`](real_model_card.md) for interpretation and [`results/real-data-benchmark.json`](results/real-data-benchmark.json) for recorded values. The Docker/Airflow end-to-end test passed on a GitHub-hosted runner using synthetic inputs. The real-data benchmark and local inference evaluation remain separate.
+See [`real_model_card.md`](real_model_card.md) for interpretation and [`results/real-data-benchmark.json`](results/real-data-benchmark.json) for recorded values. The saved real-trained XGBoost release was also imported into a GitHub-hosted Docker/Airflow/PostgreSQL run and used to score 6,080 synthetic integration-test transactions without retraining; replay and dashboard checks passed. That verifies deployment behavior, not another measurement of fraud-detection accuracy. [Integration run](https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/41322535119).
 
 ## Discussion prompts
 
@@ -86,6 +86,6 @@ See [`real_model_card.md`](real_model_card.md) for interpretation and [`results/
 - Does the result suggest overfitting, leakage, or data drift? What evidence would you need to distinguish them?
 - Why is a model's `predict_proba` output not necessarily a calibrated probability?
 
-## Before claiming completion
+## Reproducing the result
 
-The runner must finish, a model release must load in a compatible environment, and all reported metrics must agree with the saved metadata. A full database/Streamlit acceptance run is a separate check.
+The recorded experiment and deployment checks were completed on 1 November 2026. To reproduce them, use the pinned Python environment, verify the model archive checksum and metadata, run the experiment against the original dataset, and use the separate [container acceptance guide](real_model_container.md) for Airflow/PostgreSQL verification. Keep the held-out evaluation separate from synthetic integration-test scoring.
