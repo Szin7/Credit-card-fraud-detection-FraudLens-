@@ -1,46 +1,43 @@
-# Verification record
+# Verification notes
 
-This record separates execution evidence from configured but unexecuted checks.
+This page separates evidence that exists from work still on the checklist. It is not a production-readiness certificate.
 
-| Check | Result |
+## Checks already recorded
+
+| Check | Evidence |
 |---|---|
-| Unit/regression suite | 54 passed |
-| PostgreSQL integration tests | 2 skipped locally; CI service configured |
-| Line coverage of `src` and `scripts` | 85% in the recorded pytest run |
-| Ruff correctness checks (`E9`, `F`) | Passed |
-| Full five-candidate synthetic training | Completed |
-| Unlabeled batch inference | 24,120 valid rows scored |
-| Same-input replay | Zero extra transactions and predictions; source checksum unchanged |
-| Dashboard pages | All four passed Streamlit AppTest without application exceptions |
-| Docker image builds and Airflow DAG execution | Not executed in this environment |
-| GitHub Actions | Workflow supplied; no remote run yet |
-| Real-data model evaluation | Not performed |
-| AWS deployment | Not performed |
+| Synthetic end-to-end local demonstration | Completed: labeled training, unlabeled scoring, and replay with zero additional decisions |
+| Four Streamlit pages | Passed AppTest execution without application exceptions; no browser visual acceptance recorded |
+| Local source tests | Previous local report: 54 passed, two PostgreSQL tests skipped without a server |
+| GitHub Actions on 2026-10-13, commit `7b8e377` | **Passed**: 56 tests, 85% line coverage, linting, PostgreSQL test service, Compose config, and Docker image builds |
+| Airflow image DAG imports | **Passed** in GitHub Actions: both training and inference DAGs imported |
+| Synthetic five-model benchmark | Completed; details in `docs/results/synthetic-benchmark.json` |
 
-Runtime: Linux, Python 3.12; installed application versions match requirements.txt.
-The optional notebook/SHAP extras were not needed for the tested application paths.
-The dashboard check exercises page execution, not a browser-based visual acceptance
-review. Coverage reflects the test suite only; it does not include the separate full
-training or dashboard checks.
+GitHub run: https://github.com/Szin7/Credit-card-fraud-detection-FraudLens-/actions/runs/38361858659
 
-PostgreSQL could not be started here because the runtime does not support the OS
-user setup required by the server. Docker is not installed. CI supplies PostgreSQL
-16 and builds the images; its success must be checked after the repository is pushed.
-The release should not be described as fully container-verified until then.
+The October 13 GitHub Actions run completed successfully. The full Docker/Airflow execution remains a separate acceptance check.
 
-The supplied CSV and notebook used Windows line endings. These have been normalized
-to LF without changing their values or notebook content. The notebook is exploratory;
-current model results are in `docs/results/synthetic-benchmark.json`.
+## Not yet demonstrated
 
-## Material changes
+- A complete Docker Compose startup including actual Airflow training and inference execution against PostgreSQL, followed by a replay.
+- Local acceptance of dashboard appearance and interactions in a browser, including responsive layout.
+- Real-data chronological benchmark on the reference Kaggle dataset.
+- Transfer and verification of a Kaggle-trained release in the local application and database.
+- Authentication and drift monitoring for a deployed dashboard.
 
-Unlabeled scoring, finite-value validation, stable identity, atomic/replay-safe
-persistence, delayed labels, separate batch paths, immutable model releases,
-validation-only threshold selection, chronological splitting, strict JSON, isolated
-Airflow application dependencies, CI, regression tests, and a SQLite demo command.
+## Commands to repeat the checks
 
-## Remaining acceptance work
+```bash
+pytest -q
+ruff check .
+docker compose config --quiet
+docker compose build dashboard airflow-scheduler
+```
 
-Run the GitHub workflow, execute the Docker runbook, and add a real-data experiment.
-These remaining gates are why this release is not labeled “production-ready” or
-assigned a guaranteed résumé score.
+To verify against PostgreSQL, provide a disposable database with `CREATE SCHEMA` permission:
+
+```bash
+TEST_DATABASE_URL=postgresql+psycopg2://USER:PASSWORD@localhost/fraudlens_test pytest -q
+```
+
+The CI run is evidence of the tested commit, not proof that future modifications will pass. Rerun the workflow after changes are committed and document the result with its commit SHA.

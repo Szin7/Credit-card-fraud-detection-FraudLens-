@@ -1,67 +1,42 @@
 # Model card — synthetic demonstration
 
-## Intended use
+## Purpose
 
-Demonstrate batch ML engineering and review workflows. Not approved for blocking
-payments, making financial decisions, or claiming fraud reduction.
+This model demonstrates batch classification, model comparison, and a transaction-review workflow. It is not approved for blocking payments or claiming reductions in real fraud.
 
-## Data
+## Training data
 
-The generator creates 24,000 legitimate rows, 120 fraud rows, and 25 injected
-duplicates. Fraud features receive explicit distribution shifts. This makes the
-classification problem easier and more artificial than real fraud.
+The generator creates 24,000 legitimate rows and 120 fraudulent rows, plus 25 deliberately injected duplicate rows. The duplicates are rejected during validation, leaving 24,120 valid transactions. Fraud examples are generated with explicit shifts in several artificial features, so the task is easier than real fraud detection.
 
-After validation: 24,120 rows; 25 duplicates rejected. The stratified split uses
-64/16/20 train/validation/test proportions. Validation has 3,860
-rows and 19 frauds; test has 4,824 rows and 24 frauds.
+The stratified demonstration split is approximately 64/16/20 for training, validation, and test. There are 19 fraud cases in validation and 24 in the test set.
 
-## Recorded benchmark
+## Recorded holdout result
 
-Run on 2026-10-13T06:48:27.473625+00:00. See [machine-readable results](results/synthetic-benchmark.json)
-for source checksum, model comparison, and exact values.
+These figures are reproduced from `docs/results/synthetic-benchmark.json` (run at 2026-10-13T06:48:27Z). The test results below refer to the selected model at its frozen validation-selected threshold.
 
 | Measure | Result |
 |---|---:|
-| Champion | logistic_regression_smote |
-| Validation average precision | 0.9605 |
-| Test average precision | 0.9427 |
+| Champion | Logistic Regression + SMOTE |
+| Validation average precision | 0.9596 |
+| Test average precision | 0.9447 |
 | Test ROC-AUC | 0.9993 |
 | Selected threshold | 0.95 |
 | Test precision | 0.9130 |
 | Test recall | 0.8750 |
 | Test F1 | 0.8936 |
 | True positives / false negatives | 21 / 3 |
-| False positives / true negatives | 2 / 4798 |
+| False positives / true negatives | 2 / 4,798 |
 
-The approximate 95% Wilson interval for recall is 0.690–0.957.
-That interval reflects only the small holdout count; it does not account for synthetic
-data bias, model-selection uncertainty, or deployment shift.
+The approximate 95% Wilson interval for recall is 0.690 to 0.957. Only 24 fraud examples appear in the holdout, so this estimate is uncertain even before considering the limitations of synthetic data.
 
-The code calls average precision `pr_auc` for continuity with the dashboard.
-Average precision is a step-weighted precision-recall summary, not trapezoidal
-integration of the plotted curve.
+Average precision is the step-weighted precision-recall summary returned by scikit-learn; the repository calls it `pr_auc` for compatibility with the UI. It is not the same as trapezoidal integration of the drawn curve.
 
-## Selection and interpretation
+## How the model was selected
 
-Candidates fit preprocessing on training only. The SMOTE candidate resamples only
-training. Validation average precision selects the champion. Validation F1 selects
-a threshold from 0.05 through 0.95; ties favor precision, then the higher threshold.
-The selected operating point is saved with the release before holdout reporting.
-The illustrative cost sweep is shown for inspection, not used as actual business costs.
+Preprocessing and sampling were fitted on training data only. Validation average precision selected the candidate model. The threshold was chosen by validation F1 on a grid from 0.05 to 0.95, with ties broken by precision and then the higher threshold. The test holdout was evaluated only after these choices.
 
-A high score does not mean a calibrated probability. Risk bands support demonstration
-triage; they do not prescribe a payment policy. Global feature importance does not
-explain an individual transaction. Optional SHAP support may be unavailable.
+Scores are not calibrated fraud probabilities. Low/review/high risk categories are demonstration triage labels, not a payment authorization policy. Anonymous components `V1`–`V28` cannot be interpreted as known customer attributes.
 
-## Limits and next experiment
+## What remains
 
-Only 24 test fraud examples are available. The independent Gaussian synthetic
-features do not represent real card behavior, attackers, merchant activity, delayed
-feedback, or concept drift. Model rankings and the high threshold need not transfer.
-
-Obtain the reference dataset lawfully, record its source and checksum, and run a
-chronological benchmark with no temporal overlap. Preserve both successful and weak
-results. Use confidence intervals and review the false positives/negatives. Repeated
-experiments on the same holdout turn it into development data; reserve a new final
-holdout when making further modeling decisions. There is no real-data benchmark in
-this release.
+Run a separate chronological benchmark on the real reference dataset, compare false positives and false negatives, and record full reproducibility metadata. The results above must never be presented as real-data performance. See `docs/real_data_experiments.md` for the experiment plan.

@@ -65,7 +65,7 @@ def main() -> None:
 
     print(f"Wrote {len(predictions)} predictions to {output_path}")
     print(predictions["risk_level"].value_counts().rename("count"))
-    print(f"Flagged (>= threshold {settings.decision_threshold}): {int(predictions['is_flagged'].sum())}")
+    print(f"Flagged (>= release threshold {float(predictions['threshold'].iloc[0]):.2f}): {int(predictions['is_flagged'].sum())}")
 
 
 if __name__ == "__main__":
